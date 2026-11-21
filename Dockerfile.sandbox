@@ -1,0 +1,23 @@
+# QuantSentinel 回测沙箱镜像（硬约束 3：LLM 生成代码只在容器内执行）
+#
+# 安全设计：
+# - 数据由宿主预取为 Parquet 后以只读方式挂载进容器，容器内不访问外网；
+# - 不安装任何网络请求库，降低 LLM 生成代码的攻击面；
+# - 非 root 用户运行；宿主侧启动时叠加 --network=none、内存/CPU 限额与超时。
+
+FROM python:3.11-slim
+
+# 仅安装纯计算依赖
+RUN pip install --no-cache-dir \
+    "numpy>=1.26" \
+    "pandas>=2.2" \
+    "pyarrow>=17.0" \
+    "duckdb>=1.0"
+
+# 非 root 用户运行
+RUN useradd -m sandbox
+USER sandbox
+WORKDIR /sandbox
+
+# 默认入口将被宿主 docker run 覆盖
+CMD ["python", "-c", "print('quantsentinel sandbox ready')"]

@@ -1,0 +1,37 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# ---- 环境与密钥（严禁入库）----
+.env
+.env.*
+!.env.example
+
+# ---- 运行时产物（trajectory / 行情缓存 / 报告 / 沙箱临时区）----
+# 锚定仓库根目录，防止误提交演示产物与本地缓存
+/output/
+/var/
+
+# 本地 parquet 行情缓存（兜底规则：任何位置的 parquet 均不入库）
+*.parquet
+
+# 临时 / 半成品文件（报告落盘过程产物、编辑器备份）
+*.tmp
+*.part
+*~
+
+# ---- 测试与工具缓存 ----
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- IDE ----
+.idea/
+.vscode/

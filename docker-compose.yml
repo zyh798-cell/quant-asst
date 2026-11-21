@@ -1,0 +1,31 @@
+# QuantSentinel 本地基础设施：Qdrant 向量库 + 回测沙箱镜像
+#
+# 用法：
+#   docker compose up -d qdrant      # 启动 Qdrant 向量库
+#   docker compose build sandbox     # 构建回测沙箱镜像
+#
+# 说明：沙箱不常驻运行 —— tools/backtest_sandbox.py 会在每次执行 LLM 生成代码时
+# 以 quantsentinel-sandbox:latest 镜像创建一次性容器（禁网 + 资源限额），用完即毁。
+# 此处的 sandbox 服务仅用于构建与校验镜像，故置于 profile 中，up 不会启动它。
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: quantsentinel-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    image: quantsentinel-sandbox:latest
+    entrypoint: ["python", "-c", "print('quantsentinel sandbox image ready')"]
+    profiles: ["sandbox"]
+
+volumes:
+  qdrant_data:
