@@ -46,8 +46,12 @@ uv run pytest tests/test_audit.py -v
 - 触发时机：`push` 到 `main`、向 `main` 发起 `pull_request`。
 - 步骤：`actions/checkout@v4` → `astral-sh/setup-uv@v5`（缓存 uv 与虚拟环境）→
   `uv python install 3.11` → `uv sync` → `uv run pytest`。
-- mock：工作流注入 `QUANTSENTINEL_LLM_MOCK=1` 与 `LITELLM_OFFLINE_MODE=true`，
-  测试全程离线，不依赖任何真实密钥。
+- 后端与 mock：单元测试用 `monkeypatch` 替换 `litellm.completion` 注入确定性响应，
+  走真实 LiteLLM 后端路径，无需密钥；`tests/conftest.py` 会清除外部注入的
+  `QUANTSENTINEL_LLM_MOCK`，保证本地与 CI 一致。示例测试由 `tests/test_examples.py`
+  在子进程内自设 `QUANTSENTINEL_LLM_MOCK=1`。因此工作流**不注入全局 mock**——
+  注入会切换到 `MockCompletionBackend`，使依赖 `litellm.completion` 注入的单元测试
+  收不到响应而失败；工作流仅设置 `LITELLM_OFFLINE_MODE=true` 避免 litellm 导入期网络请求。
 - 测试报告：`pytest --junitxml=pytest.xml`，并上传为 `pytest-report` artifact。
 - badge：README 头部 tests 徽章指向该工作流状态；失败时 job 退出码非 0，徽章变红。
 - 本地复现：`uv sync && uv run pytest`。
