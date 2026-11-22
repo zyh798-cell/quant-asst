@@ -9,7 +9,9 @@
 <p>
   <img src="https://img.shields.io/badge/License-MIT-2ea44f" alt="License MIT">
   <img src="https://img.shields.io/badge/Python-%E2%89%A53.11-3776ab" alt="Python &gt;= 3.11">
-  <img src="https://img.shields.io/badge/tests-pending-lightgrey" alt="tests status">
+  <a href="https://github.com/zyh798-cell/quant-asst/actions/workflows/ci.yml">
+    <img src="https://github.com/zyh798-cell/quant-asst/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
   <a href="https://github.com/zyh798-cell/quant-asst">
     <img src="https://img.shields.io/badge/zyh798--cell%2Fquant--ast-3776ab" alt="zyh798-cell/quant-asst">
   </a>

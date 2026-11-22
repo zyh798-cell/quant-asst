@@ -40,6 +40,18 @@ uv run pytest tests/test_audit.py -v
 - **命名一致性**：断言中的指标名、风险等级须与 `core/schemas.py` 一致
   （`low` / `medium` / `high` / `critical`；决策 `adopt` / `revise` / `reject` / `blocked`）。
 
+### 持续集成（GitHub Actions）
+
+- 工作流：`.github/workflows/ci.yml`，运行环境 `ubuntu-latest`。
+- 触发时机：`push` 到 `main`、向 `main` 发起 `pull_request`。
+- 步骤：`actions/checkout@v4` → `astral-sh/setup-uv@v5`（缓存 uv 与虚拟环境）→
+  `uv python install 3.11` → `uv sync` → `uv run pytest`。
+- mock：工作流注入 `QUANTSENTINEL_LLM_MOCK=1` 与 `LITELLM_OFFLINE_MODE=true`，
+  测试全程离线，不依赖任何真实密钥。
+- 测试报告：`pytest --junitxml=pytest.xml`，并上传为 `pytest-report` artifact。
+- badge：README 头部 tests 徽章指向该工作流状态；失败时 job 退出码非 0，徽章变红。
+- 本地复现：`uv sync && uv run pytest`。
+
 ## 3. 新增一个 Agent
 
 以「新增一个独立分析角色」为例，步骤如下（不改动既有 Agent 行为）：
