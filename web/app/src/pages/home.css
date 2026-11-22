@@ -1,0 +1,111 @@
+@reference "../index.css";
+@layer components {
+  /* ---- 能力：全流程六步 ---- */
+  .capability-grid {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .capability {
+    @apply rounded-lg border border-rule bg-surface p-5 shadow-sm;
+  }
+  .capability--wide {
+    @apply sm:col-span-2;
+  }
+  .capability__index {
+    @apply text-caption font-medium text-accent-ink;
+  }
+  .capability__title {
+    @apply mt-1 font-display text-title font-semibold text-ink;
+  }
+  .capability__text {
+    @apply mt-2 text-label text-muted;
+  }
+
+  /* ---- 流水线：步骤与连线 ---- */
+  .pipeline {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-6;
+  }
+  .pipeline__step {
+    @apply relative rounded-lg border border-rule bg-surface p-4 shadow-sm;
+  }
+  .pipeline__arrow {
+    @apply absolute top-1/2 right-[-13px] hidden h-px w-[12px] origin-left bg-rule-strong lg:block;
+  }
+  .pipeline__index {
+    @apply text-caption font-medium text-accent-ink;
+  }
+  .pipeline__title {
+    @apply mt-1 font-display text-title font-semibold text-ink;
+  }
+  .pipeline__meta {
+    @apply mt-1 text-caption text-muted;
+  }
+
+  /* ---- 辩论：四角色 ---- */
+  .debate-grid {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-4;
+  }
+  .role-card {
+    @apply flex flex-col rounded-lg border border-rule bg-surface p-5 shadow-sm;
+  }
+  .role-card__head {
+    @apply flex items-center gap-3;
+  }
+  .role-card__avatar {
+    @apply flex size-10 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-accent-ink;
+  }
+  .role-card__title {
+    @apply font-display text-title font-semibold text-ink;
+  }
+  .role-card__sub {
+    @apply text-micro text-muted;
+  }
+  .role-card__io {
+    @apply mt-4 space-y-2 border-t border-rule pt-3 text-caption;
+  }
+  .role-card__io dt {
+    @apply text-muted;
+  }
+  .role-card__io dd {
+    @apply text-body;
+  }
+
+  /* ---- 风控分级 ---- */
+  .risk-scale {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-4;
+  }
+  .risk-cell {
+    @apply rounded-lg border border-rule bg-surface p-5 shadow-sm;
+  }
+  .risk-cell__bar {
+    @apply mt-4 h-1.5 w-full rounded-pill bg-ink-100;
+  }
+  .risk-cell__bar > span {
+    @apply block h-full rounded-pill;
+  }
+  .risk-cell__title {
+    @apply mt-3 font-display text-title font-semibold text-ink;
+  }
+  .risk-cell__desc {
+    @apply mt-1 text-caption text-muted;
+  }
+  .risk-cell__decision {
+    @apply mt-3; /* 徽章对齐 */
+  }
+
+  /* ---- 报告双格式 ---- */
+  .report-grid {
+    @apply grid gap-4 lg:grid-cols-2;
+  }
+  .report-card {
+    @apply rounded-lg border border-rule bg-surface p-5 shadow-sm;
+  }
+  .report-card__title {
+    @apply font-display text-title font-semibold text-ink;
+  }
+  .report-card__text {
+    @apply mt-2 text-label text-muted;
+  }
+  .report-card__frame {
+    @apply mt-4 overflow-hidden rounded-md border border-rule bg-ink-100/40;
+  }
+}

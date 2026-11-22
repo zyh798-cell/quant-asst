@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="presentation">
+  <!-- Layer · monitor-side-1（左副屏，屏幕开口 x=74 y=186 w=238 h=166） -->
+  <ellipse cx="183" cy="404" rx="54" ry="8" fill="var(--color-ink-800, #23262B)"/>
+  <rect x="176" y="360" width="14" height="44" fill="var(--color-ink-800, #23262B)"/>
+  <rect x="64" y="176" width="258" height="186" rx="10" fill="var(--color-ink, #14161A)"/>
+  <rect x="74" y="186" width="238" height="166" rx="4" fill="var(--color-ink-800, #23262B)"/>
+  <rect x="74" y="186" width="238" height="166" rx="4" fill="none" stroke="var(--color-ink-700, #3A3E45)" stroke-width="2"/>
+  <circle cx="193" cy="344" r="3" fill="var(--color-ink-700, #3A3E45)"/>
+</svg>

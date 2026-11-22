@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="presentation">
+  <!-- Layer · screen-content-main（主屏静态帧，屏幕区 x=354 y=122 w=292 h=200）
+       涨=var(--chart-buy) 红 / 跌=var(--chart-sell) 绿，与中国市场惯例一致 -->
+  <rect x="354" y="122" width="292" height="200" fill="var(--color-ink-900, #14161A)"/>
+  <g stroke="var(--chart-grid, #D9D2C4)" stroke-width="1" opacity="0.35">
+    <line x1="354" y1="162" x2="646" y2="162"/>
+    <line x1="354" y1="212" x2="646" y2="212"/>
+    <line x1="354" y1="262" x2="646" y2="262"/>
+    <line x1="354" y1="312" x2="646" y2="312"/>
+  </g>
+  <g stroke-width="2">
+    <line x1="366" y1="258" x2="366" y2="298" stroke="var(--chart-buy, #C0392B)"/><rect x="360" y="266" width="12" height="16" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="389" y1="250" x2="389" y2="282" stroke="var(--chart-buy, #C0392B)"/><rect x="383" y="254" width="12" height="12" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="412" y1="242" x2="412" y2="270" stroke="var(--chart-sell, #18A67C)"/><rect x="406" y="254" width="12" height="8" fill="var(--chart-sell, #18A67C)"/>
+    <line x1="435" y1="226" x2="435" y2="266" stroke="var(--chart-buy, #C0392B)"/><rect x="429" y="234" width="12" height="28" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="458" y1="218" x2="458" y2="250" stroke="var(--chart-sell, #18A67C)"/><rect x="452" y="234" width="12" height="8" fill="var(--chart-sell, #18A67C)"/>
+    <line x1="481" y1="202" x2="481" y2="246" stroke="var(--chart-buy, #C0392B)"/><rect x="475" y="206" width="12" height="36" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="504" y1="186" x2="504" y2="222" stroke="var(--chart-buy, #C0392B)"/><rect x="498" y="198" width="12" height="8" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="527" y1="190" x2="527" y2="234" stroke="var(--chart-sell, #18A67C)"/><rect x="521" y="198" width="12" height="28" fill="var(--chart-sell, #18A67C)"/>
+    <line x1="550" y1="178" x2="550" y2="230" stroke="var(--chart-buy, #C0392B)"/><rect x="544" y="182" width="12" height="44" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="573" y1="162" x2="573" y2="198" stroke="var(--chart-sell, #18A67C)"/><rect x="567" y="182" width="12" height="8" fill="var(--chart-sell, #18A67C)"/>
+    <line x1="596" y1="146" x2="596" y2="194" stroke="var(--chart-buy, #C0392B)"/><rect x="590" y="150" width="12" height="40" fill="var(--chart-buy, #C0392B)"/>
+    <line x1="619" y1="130" x2="619" y2="166" stroke="var(--chart-buy, #C0392B)"/><rect x="613" y="142" width="12" height="8" fill="var(--chart-buy, #C0392B)"/>
+  </g>
+  <rect x="566" y="132" width="72" height="20" rx="4" fill="var(--color-ink, #14161A)"/>
+  <text x="602" y="146" text-anchor="middle" font-family="var(--font-mono, monospace)" font-size="13" fill="var(--chart-buy, #C0392B)">150.24</text>
+</svg>

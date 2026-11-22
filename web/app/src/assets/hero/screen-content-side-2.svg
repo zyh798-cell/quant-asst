@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="presentation">
+  <!-- Layer · screen-content-side-2（右副屏静态帧：辩论流程状态 + 审计通过率，屏幕区 x=682 y=174 w=230 h=162） -->
+  <rect x="682" y="174" width="230" height="162" fill="var(--color-ink-900, #14161A)"/>
+  <rect x="692" y="184" width="60" height="12" rx="3" fill="var(--color-ink, #14161A)"/>
+
+  <g font-family="var(--font-body, sans-serif)" font-size="10" fill="var(--color-ink-100, #E7E1D5)">
+    <circle cx="697" cy="216" r="4" fill="var(--color-accent, #18A67C)"/><text x="709" y="220">解析完成</text>
+    <circle cx="697" cy="238" r="4" fill="var(--color-accent, #18A67C)"/><text x="709" y="242">回测完成</text>
+    <circle cx="697" cy="260" r="4" fill="var(--color-warning, #B8860B)"/><text x="709" y="264">辩论进行中</text>
+    <circle cx="697" cy="282" r="4" fill="var(--color-ink-700, #3A3E45)"/><text x="709" y="286" fill="var(--color-ink-300, #A9A296)">审计等待</text>
+  </g>
+
+  <circle cx="852" cy="262" r="26" fill="none" stroke="var(--color-ink-700, #3A3E45)" stroke-width="6"/>
+  <circle cx="852" cy="262" r="26" fill="none" stroke="var(--color-accent, #18A67C)" stroke-width="6"
+          stroke-dasharray="108 164" stroke-linecap="round" transform="rotate(-90 852 262)"/>
+  <text x="852" y="266" text-anchor="middle" font-family="var(--font-mono, monospace)" font-size="13" fill="var(--color-ink-100, #E7E1D5)">66%</text>
+
+  <g fill="var(--color-ink-700, #3A3E45)">
+    <rect x="692" y="306" width="210" height="6" rx="3"/>
+    <rect x="692" y="318" width="160" height="6" rx="3"/>
+  </g>
+</svg>

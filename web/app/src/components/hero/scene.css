@@ -1,0 +1,45 @@
+/* 分层动效场景：透明背景，融入页面底色，无封闭卡片框 */
+.scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 960 / 640;
+}
+
+.scene__layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scene__layer > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.scene__screens {
+  position: absolute;
+  inset: 0;
+}
+
+.scene__canvas {
+  position: absolute;
+}
+
+.scene__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 降级：静态分层合成帧，隐藏动画画布 */
+.scene--static .scene__canvas {
+  display: none;
+}
+
+/* 移动端（<768px）：静态帧 + 轻微浮动视差由滚动编排处理，不加载 WebGL */
+@media (max-width: 768px) {
+  .scene__canvas {
+    display: none;
+  }
+}

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="presentation">
+  <!-- Layer · props-desk（键盘 / 鼠标 / 咖啡杯 / 绿植） -->
+  <!-- keyboard -->
+  <rect x="386" y="450" width="176" height="20" rx="4" fill="var(--color-ink-800, #23262B)"/>
+  <line x1="398" y1="455" x2="550" y2="455" stroke="var(--color-ink-700, #3A3E45)" stroke-width="2"/>
+  <line x1="398" y1="461" x2="550" y2="461" stroke="var(--color-ink-700, #3A3E45)" stroke-width="2"/>
+  <line x1="398" y1="467" x2="538" y2="467" stroke="var(--color-ink-700, #3A3E45)" stroke-width="2"/>
+
+  <!-- mouse -->
+  <ellipse cx="596" cy="458" rx="20" ry="12" fill="var(--color-ink-800, #23262B)"/>
+  <line x1="596" y1="447" x2="596" y2="455" stroke="var(--color-ink-700, #3A3E45)" stroke-width="2"/>
+
+  <!-- coffee cup -->
+  <rect x="308" y="404" width="32" height="34" rx="5" fill="var(--color-body, #2A2D33)"/>
+  <rect x="308" y="404" width="32" height="7" rx="3" fill="var(--color-ink-700, #3A3E45)"/>
+  <path d="M340 414 q14 4 0 16" fill="none" stroke="var(--color-body, #2A2D33)" stroke-width="5"/>
+  <g class="scene-steam" fill="none" stroke="var(--color-ink-300, #A9A296)" stroke-width="3" stroke-linecap="round">
+    <path class="scene-steam-1" d="M318 396 q4 -8 0 -14 q-4 -6 0 -12"/>
+    <path class="scene-steam-2" d="M330 396 q4 -8 0 -14 q-4 -6 0 -12"/>
+  </g>
+
+  <!-- potted plant -->
+  <path d="M884 404 C 870 380 872 356 884 344 C 896 356 898 380 884 404 Z" fill="var(--color-accent, #18A67C)"/>
+  <path d="M884 404 C 866 392 856 372 860 356 C 876 364 886 384 884 404 Z" fill="var(--color-accent-ink, #0E6B50)"/>
+  <path d="M884 404 C 902 392 912 372 908 356 C 892 364 882 384 884 404 Z" fill="var(--color-accent, #18A67C)"/>
+  <rect x="862" y="404" width="44" height="36" rx="5" fill="var(--color-body, #2A2D33)"/>
+  <rect x="862" y="404" width="44" height="6" rx="3" fill="var(--color-ink-700, #3A3E45)"/>
+</svg>

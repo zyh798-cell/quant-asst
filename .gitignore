@@ -12,6 +12,11 @@ venv/
 .env.*
 !.env.example
 
+# ---- 前端（web/app，Vite + React）----
+node_modules/
+*.local
+*.tsbuildinfo
+
 # ---- 运行时产物（trajectory / 行情缓存 / 报告 / 沙箱临时区）----
 # 锚定仓库根目录，防止误提交演示产物与本地缓存
 /output/
@@ -35,3 +40,13 @@ htmlcov/
 # ---- IDE ----
 .idea/
 .vscode/
+
+# ---- 外部 Agent Skill（第三方技能包，本地安装不入库）----
+# 规则来源已提炼进 docs/design/；技能包本体由上游仓库或 skills CLI 重新安装
+.agents/
+.codebuddy/
+.minimax/
+.windsurf/
+.claude/
+.cursor/
+skills-lock.json

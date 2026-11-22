@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" role="presentation">
+  <!-- Layer · person（人物与椅子，分组可动：#scene-chair / #scene-arm-l / #scene-body / #scene-head / #scene-arm-r）
+       人物面朝右侧主屏，坐姿；动效由站点 CSS 驱动，reduce 时静止 -->
+  <g id="scene-chair">
+    <rect x="108" y="286" width="30" height="152" rx="14" fill="var(--color-ink-800, #23262B)"/>
+    <rect x="98" y="424" width="140" height="26" rx="12" fill="var(--color-ink-800, #23262B)"/>
+    <rect x="200" y="356" width="14" height="72" rx="6" fill="var(--color-ink-800, #23262B)"/>
+    <rect x="190" y="346" width="46" height="14" rx="7" fill="var(--color-ink-800, #23262B)"/>
+    <rect x="158" y="450" width="12" height="58" fill="var(--color-ink-700, #3A3E45)"/>
+    <path d="M164 508 L164 518 M164 518 L124 530 M164 518 L204 530 M164 518 L140 534 M164 518 L188 534"
+          fill="none" stroke="var(--color-ink-800, #23262B)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="124" cy="532" r="6" fill="var(--color-ink, #14161A)"/>
+    <circle cx="204" cy="532" r="6" fill="var(--color-ink, #14161A)"/>
+    <circle cx="140" cy="536" r="6" fill="var(--color-ink, #14161A)"/>
+    <circle cx="188" cy="536" r="6" fill="var(--color-ink, #14161A)"/>
+  </g>
+
+  <g id="scene-legs">
+    <path d="M178 444 L288 454" fill="none" stroke="var(--color-body, #2A2D33)" stroke-width="34" stroke-linecap="round"/>
+    <path d="M288 454 L290 494" fill="none" stroke="var(--color-body, #2A2D33)" stroke-width="26" stroke-linecap="round"/>
+    <rect x="276" y="492" width="74" height="20" rx="9" fill="var(--color-ink-100, #E7E1D5)"/>
+    <rect x="276" y="506" width="74" height="6" rx="3" fill="var(--color-rule, #D9D2C4)"/>
+  </g>
+
+  <g id="scene-body">
+    <rect x="146" y="312" width="124" height="138" rx="24" fill="var(--color-ink-100, #E7E1D5)"/>
+    <path d="M154 322 Q174 302 200 312 L200 338 Q176 328 154 340 Z" fill="var(--color-rule, #D9D2C4)"/>
+    <path d="M214 330 L212 354 M228 330 L230 354" stroke="var(--color-rule-strong, #BFB6A4)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M196 312 Q212 326 230 312" fill="none" stroke="var(--color-rule, #D9D2C4)" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g id="scene-arm-l">
+    <path d="M162 330 C 180 366 226 420 296 448" fill="none" stroke="var(--color-rule, #D9D2C4)" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="298" cy="448" r="10" fill="var(--color-scene-skin, #F2D8C0)"/>
+  </g>
+
+  <g id="scene-head">
+    <circle cx="210" cy="256" r="42" fill="var(--color-ink, #14161A)"/>
+    <path d="M176 244 L162 232 L178 228 Z" fill="var(--color-ink, #14161A)"/>
+    <path d="M188 226 L180 210 L196 220 Z" fill="var(--color-ink, #14161A)"/>
+    <path d="M208 220 L206 202 L220 216 Z" fill="var(--color-ink, #14161A)"/>
+    <path d="M230 224 L238 208 L244 224 Z" fill="var(--color-ink, #14161A)"/>
+    <circle cx="182" cy="274" r="8" fill="var(--color-scene-skin, #F2D8C0)"/>
+    <circle cx="228" cy="278" r="30" fill="var(--color-scene-skin, #F2D8C0)"/>
+    <ellipse cx="244" cy="272" rx="4" ry="5.5" fill="var(--color-ink, #14161A)"/>
+    <path d="M236 259 q8 -3 14 1" fill="none" stroke="var(--color-ink, #14161A)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M254 278 l5 7" fill="none" stroke="#D9A88F" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M246 294 q6 4 12 0" fill="none" stroke="#C98F7A" stroke-width="2.5" stroke-linecap="round"/>
+    <ellipse cx="234" cy="286" rx="7" ry="3.5" fill="var(--color-scene-blush, #E8A894)" opacity="0.45"/>
+  </g>
+
+  <g id="scene-arm-r">
+    <path d="M254 332 C 296 362 356 424 408 448" fill="none" stroke="var(--color-ink-100, #E7E1D5)" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="408" cy="448" r="11" fill="var(--color-scene-skin, #F2D8C0)"/>
+  </g>
+</svg>

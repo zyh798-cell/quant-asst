@@ -107,19 +107,84 @@ quant-asst/
 ├── audit/               # 审计编排与报告落盘
 ├── examples/            # 示例脚本集（5 组演示 + 策略模板 + 校验 + 清理）与 _common 公共底座
 ├── tests/               # pytest 单元测试与示例回归
-├── docs/                # 架构、开发与品牌文档
-├── assets/              # 品牌资产（Logo）
+├── docs/                # 架构、开发、品牌与前端设计规范文档
+├── assets/              # 品牌资产（Logo）与首屏场景参考图
+├── web/app/             # 官网首页 + 动态工具站（Vite + React 19 + TS + Tailwind v4）
+├── server/              # FastAPI 薄接口层（Step B：复用 core/backtest/report/audit）
 ├── var/                 # 运行时数据（轨迹 / 行情缓存 / 沙箱工作区，不入库）
 └── output/              # 交付物（辩论 / 审计 / HTML 报告，不入库）
 ```
 
 源码以扁平包组织（`core` / `agents` / `tools` / `data` / `backtest` / `report` / `audit`），不使用 `src/` 容器。
 
+## Web 应用（官网首页 + 工具站）
+
+前端位于 [`web/app/`](web/app/)，技术栈为 **Vite 8 + React 19 + TypeScript + Tailwind CSS v4 + shadcn 风格组件 + Zustand + TanStack Query + Recharts**，滚动叙事使用 GSAP ScrollTrigger + Lenis。
+
+- **`/`** 官网首页：分层构建的动漫工作台首屏（人物 / 桌椅 / 三台显示器 / 屏幕内容 / 桌面道具各自独立 SVG 层，屏幕内容为可替换的 canvas 区域），K 线逐根生长的确定性动画，全流程能力、流水线、多空辩论、风控分级、双格式报告五个叙事区块。
+- **`/studio`** 动态工具站：策略配置 → 流水线状态 → 回测指标与净值 / 回撤曲线 / 成交记录 → 辩论审计视图 → Markdown 报告下载。默认走本地确定性 mock，无需密钥。
+
+本地预览：
+
+```bash
+cd web/app
+npm install
+npm run dev        # http://localhost:5173
+```
+
+生产构建：
+
+```bash
+cd web/app
+npm run build      # 产物在 web/app/dist/
+npm run preview
+```
+
+### Step B：双端联调（接口层 + 工具站）
+
+接口层位于 [`server/`](server/)，是**薄编排层**：只做 HTTP 契约、任务状态机与产物 DTO 转换，策略逻辑全部复用 `core` / `agents` / `tools` / `backtest` / `report` / `audit`，不新写策略代码，也不接触密钥。
+
+启动顺序（两个终端，先后端后前端）：
+
+```bash
+# 终端 1：接口层
+uv run uvicorn server.main:app --reload --port 8000
+
+# 终端 2：工具站
+cd web/app
+npm run dev        # http://localhost:5173
+```
+
+- 前端默认直连 `http://localhost:8000`，可用环境变量 `VITE_API_BASE` 覆盖；后端 CORS 已放行 `http://localhost:5173` 与 `http://127.0.0.1:5173`。`vite.config.ts` 另配了 `/api` 代理作为备选。
+- 工具站的运行模式由配置切换：**mock 离线**在浏览器本地生成确定性样例（无需密钥、无需后端）；**真实模式**把请求发往后端接口层。真实模式创建任务后每 1.5 秒轮询一次状态，**阶段完成即增量渲染**，不等全流程结束。
+- 密钥按 LiteLLM 约定从进程环境变量读取；接口层对已知密钥值与 `sk-*` / `api_key=` 字面量做脱敏，**密钥不会出现在任何响应字段、任务快照或错误文本中**（见 `tests/test_api.py` 的泄漏断言）。
+
+接口简表：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/analyses` | 创建分析任务，后台执行，返回 `201` + 初始状态 |
+| `GET` | `/api/analyses` | 任务列表（按创建时间倒序，便于调试） |
+| `GET` | `/api/analyses/{id}` | 任务状态 + 已完成阶段产物（前端轮询） |
+| `GET` | `/api/analyses/{id}/report?format=md\|html` | 报告正文，`Content-Type` 为 `text/markdown` 或 `text/html` |
+| `GET` | `/api/health` | 健康检查，返回 `{"status":"ok","mode":"mock\|real"}` |
+
+任务状态机：`pending → running → stage_done → completed`，异常转 `failed` 并写入脱敏后的错误信息；六个阶段 `parse → backtest → debate → audit → risk → report` 各自独立记录 `pending / running / done / failed / skipped` 与结构化产物。任务执行串行化，保证进程级 `QUANTSENTINEL_LLM_MOCK` / `LITELLM_OFFLINE_MODE` 不与并发任务互串。报告落盘于 `var/reports/<task_id>/`（Markdown + JSON + 单文件 HTML）。
+
+### 素材与裂图根因
+
+首屏场景素材统一放在 `web/app/src/assets/hero/`，按层命名（`person` / `desk` / `monitor-main` / `monitor-side-1` / `monitor-side-2` / `screen-content-*` / `props-desk`），屏幕内容区单独透明遮罩容器，可整体替换。
+
+**品牌资产一律通过 Vite import 引入**（如 `import logo from '@/assets/brand/logo-color.svg'`），禁止在 `index.html` 或 CSS 中写 `../../assets/...` 相对路径——GitHub Pages 子路径部署时 `..` 会被服务器拒绝，导致 Logo 裂图。旧静态落地页方案即因此废弃，目录已移除，避免出现双首页。
+
+视觉规范见 [`docs/design/`](docs/design/)：色值、间距、字体、圆角、阴影、动效参数只在 `TOKENS.md` 定义一次，前端通过 Tailwind v4 的 `@theme`（CSS variables）映射，页面样式全部引用令牌。
+
 ## 文档
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)：分层结构、模块职责、数据流与设计约束。
 - [`docs/DEVELOP.md`](docs/DEVELOP.md)：项目初始化、新增 Agent / 示例规范、测试约定与排查。
 - [`docs/BRAND.md`](docs/BRAND.md)：品牌名称、Logo 资产、色彩与使用约定。
+- [`docs/design/README.md`](docs/design/README.md)：前端设计规范入口（设计令牌、禁用清单、金融数据产品准则）。
 - [`examples/README.md`](examples/README.md)：示例脚本一览、推荐运行顺序与产物说明。
 
 ## 风险声明
