@@ -91,8 +91,13 @@ def test_dual_ma_output_is_row_aligned() -> None:
 def test_dual_ma_on_cached_real_data() -> None:
     """真实缓存数据回归：双均线必须有成交、总收益非零（零成交事故的核心校验）。"""
     cache = sorted((Path(__file__).resolve().parents[1] / "var" / "market").rglob("*.parquet"))
+    # var/market 会随本地取数累积任意区间的缓存；本用例验证的是「趋势行情下必成交」，
+    # 窗口过短（不足双均线预热 + 一轮交叉）时零成交属正常现象，不应判为回归失败。
+    min_bars = SHORT_WINDOW + LONG_WINDOW * 2
     for path in cache:
         df = pd.read_parquet(path)
+        if len(df) < min_bars:
+            continue
         result = run_event_backtest(
             df, generate_positions, CN_STOCK_RULES, initial_capital=INITIAL_CAPITAL,
         )

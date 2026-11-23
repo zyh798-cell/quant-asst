@@ -193,7 +193,7 @@ def render_final_html(
     audit_report: dict[str, Any] | None,
     debate_outcome: dict[str, Any] | None,
     kline_df: Any = None,
-    source_note: str = "QuantSentinel 多智能体量化研究引擎",
+    source_note: str = "Quant Asst 多智能体量化研究引擎",
 ) -> str:
     """渲染单文件交互式 HTML 最终报告。
 
@@ -288,7 +288,7 @@ def render_final_html(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QuantSentinel 最终量化分析报告：{_esc(str(symbol))}</title>
+<title>Quant Asst 最终量化分析报告：{_esc(str(symbol))}</title>
 <script>{plotly_js}</script>
 <style>
   :root {{ --nav:{_COLORS['nav']}; --dd:{_COLORS['drawdown']}; --text:{_COLORS['text']};

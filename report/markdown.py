@@ -51,7 +51,7 @@ def render_debate_markdown(outcome: dict[str, Any]) -> str:
         f"| 辩论轮次 | {outcome.get('rounds', 0)} |",
         f"| run_id | `{outcome.get('run_id', '')}` |",
         "",
-        "本报告由 QuantSentinel 多智能体辩论流程自动生成，仅用于研究与教育，不构成投资建议。",
+        "本报告由 Quant Asst 多智能体辩论流程自动生成，仅用于研究与教育，不构成投资建议。",
         "",
     ]
 
@@ -209,7 +209,7 @@ def render_audit_markdown(
         f"| 综合风险定级 | **{label}（{level}）** |",
         f"| 交易建议可行性 | {audit_report.get('tradability', '')} |",
         "",
-        "本意见书由 QuantSentinel 红队审计 Agent 独立产出，不参与多空辩论，仅做风险定级；"
+        "本意见书由 Quant Asst 红队审计 Agent 独立产出，不参与多空辩论，仅做风险定级；"
         "仅用于研究与教育，不构成投资建议。",
         "",
     ])
@@ -314,7 +314,7 @@ def render_final_markdown(final_report: dict[str, Any]) -> str:
         f"| 最终决策 | **{final_report.get('final_decision', '')}** |",
         f"| 策略可信度 | {final_report.get('credibility_score', 'N/A')} / 100 |",
         "",
-        "本报告由 QuantSentinel 风控综合官在「多空辩论 + 红队审计」之后产出，"
+        "本报告由 Quant Asst 风控综合官在「多空辩论 + 红队审计」之后产出，"
         "仅用于研究与教育，不构成投资建议。",
         "",
     ])

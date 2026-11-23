@@ -31,7 +31,7 @@ def create_app(manager: TaskManager | None = None) -> FastAPI:
     load_env_file()  # 真实模式下读取项目 .env 中的 LLM 密钥
 
     app = FastAPI(
-        title="QuantSentinel API",
+        title="Quant Asst API",
         description=(
             "多智能体协作量化研究引擎接口层。仅用于研究与教育，不构成投资建议，"
             "不提供实盘下单能力。"

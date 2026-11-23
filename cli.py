@@ -1,4 +1,4 @@
-"""QuantSentinel 命令行入口（typer）。"""
+"""Quant Asst 命令行入口（typer）。"""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from core.config import Settings, get_settings
 from core.secrets import load_env_file, present_keys, secret_exists
 
 app = typer.Typer(
-    help="QuantSentinel —— 多智能体多市场量化研究引擎（仅用于教育与研究，不构成投资建议）",
+    help="Quant Asst —— 多智能体多市场量化研究引擎（仅用于教育与研究，不构成投资建议）",
     no_args_is_help=True,
 )
 console = Console()
@@ -467,7 +467,7 @@ def doctor() -> None:
     )
     rows.append(("运行时目录 var/", "OK" if dirs_ok else "FAIL", "已创建" if dirs_ok else "缺失"))
 
-    table = Table(title=f"QuantSentinel 环境自检（Python {platform.python_version()}）")
+    table = Table(title=f"Quant Asst 环境自检（Python {platform.python_version()}）")
     table.add_column("检查项", style="cyan")
     table.add_column("状态")
     table.add_column("说明", overflow="fold")

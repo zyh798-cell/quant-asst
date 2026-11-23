@@ -29,7 +29,7 @@ from core.schemas import BacktestResult
 #: runner.py 模板：沙箱内唯一执行入口（宿主生成，属可信代码）
 RUNNER_TEMPLATE = '''\
 # -*- coding: utf-8 -*-
-"""QuantSentinel 沙箱执行入口（宿主生成，勿手改）。
+"""Quant Asst 沙箱执行入口（宿主生成，勿手改）。
 
 流程：读 data.parquet -> 加载 strategy.generate_positions -> 事件回测 -> 写 result.json
 """

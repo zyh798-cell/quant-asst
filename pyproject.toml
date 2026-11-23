@@ -3,7 +3,7 @@ name = "quantsentinel"
 version = "0.1.0"
 description = "QuantSentinel - 多智能体协作的多市场量化研究引擎（仅用于教育与研究，不构成投资建议）"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"   # akshare>=1.20.46（美股接口更名）要求 Python>=3.11.5
 license = { text = "MIT" }
 dependencies = [
     # ---- Agent 编排与 LLM ----
@@ -14,7 +14,7 @@ dependencies = [
     "pydantic-settings>=2.3.0",
     "tenacity>=8.3.0",            # 结构化输出校验失败重试
     # ---- 行情数据（多市场）----
-    "akshare>=1.14.0",            # A股/港股/美股/期货 免费行情
+    "akshare>=1.20.46,<2",        # A股/港股/美股/期货 免费行情；1.20.46 起美股接口更名 stock_us_daily_sina
     "ccxt>=4.3.0",                # 加密货币交易所行情（7x24）
     # ---- 存储与计算 ----
     "duckdb>=1.0.0",              # 本地分析型查询

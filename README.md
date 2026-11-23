@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/License-MIT-2ea44f" alt="License MIT">
-  <img src="https://img.shields.io/badge/Python-%E2%89%A53.11-3776ab" alt="Python &gt;= 3.11">
+  <img src="https://img.shields.io/badge/Python-%E2%89%A53.11.5-3776ab" alt="Python &gt;= 3.11.5">
   <a href="https://github.com/zyh798-cell/quant-asst/actions/workflows/ci.yml">
     <img src="https://github.com/zyh798-cell/quant-asst/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
@@ -36,7 +36,7 @@ Quant Asst 是一个基于多 Agent 协作的量化策略研究与风控审计�
 
 ### 环境要求
 
-- Python **3.11 或更高版本**（`pyproject.toml` 声明 `requires-python = ">=3.11"`）。
+- Python **3.11.5 或更高版本**（`pyproject.toml` 声明 `requires-python = ">=3.11.5"`，受 akshare 最低版本约束）。
 - [uv](https://docs.astral.sh/uv/) 作为依赖与虚拟环境管理器。
 
 ### 安装

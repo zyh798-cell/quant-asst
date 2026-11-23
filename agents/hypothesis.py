@@ -34,7 +34,7 @@ _MARKET_LABELS: dict[str, str] = {
 
 #: 代码生成契约（system prompt，固定不模板化）
 CODE_CONTRACT_SYSTEM = """\
-你是 QuantSentinel 的策略代码生成器。只输出一个 Python 模块源码\
+你是 Quant Asst 的策略代码生成器。只输出一个 Python 模块源码\
 （无 markdown 围栏、无解释文字），必须满足以下契约：
 
 1. 定义函数 generate_positions(df)，返回 pandas.Series：

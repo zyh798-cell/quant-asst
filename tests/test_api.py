@@ -297,3 +297,48 @@ def test_incremental_stage_progress(client: TestClient) -> None:
 def test_health_has_no_secret(client: TestClient) -> None:
     body = client.get("/api/health").json()
     assert body == {"status": "ok", "mode": "mock"}
+
+
+# --------------------------------------------------------------------------
+# 初始资金透传（表单值必须一路传到回测与报告，不得回落默认值）
+# --------------------------------------------------------------------------
+
+
+def test_initial_capital_is_threaded_to_backtest_and_report(
+    client: TestClient, test_settings
+) -> None:
+    """自定义初始资金须同时体现在回测产物、请求回显与 HTML 报告中。
+
+    回归对象：早期版本出现过「表单提交 100000、HTML 报告显示 1,000,000」的
+    参数丢失（回落工具层默认值）。此处用非默认值 880_000 走完整链路，
+    断言三个环节数值一致。
+    """
+    capital = 880_000.0
+    data = _create(client, initial_capital=capital)
+    task_id = data["id"]
+    # 创建响应即回显请求参数
+    assert data["request"]["initial_capital"] == capital
+
+    final = _wait_terminal(client, task_id)
+    assert final["status"] == "completed", final.get("error")
+
+    stages = _stages(final)
+    backtest = stages["backtest"]["data"]
+    assert backtest["initial_capital"] == capital
+    # 期末净值应随初始资金变化，而不是恒为默认值量级
+    assert backtest["final_equity"] > 0
+
+    # HTML 报告的指标面板展示同一数值
+    html = client.get(f"/api/analyses/{task_id}/report", params={"format": "html"})
+    assert html.status_code == 200
+    expected = f"{capital:,.2f}"
+    assert expected in html.text
+    # 不得出现默认值的痕迹
+    assert "1,000,000.00" not in html.text
+    # 结构化 JSON 归档同样保留请求口径
+    report_dir = test_settings.report_dir / task_id
+    json_files = list(report_dir.glob("analysis_*.json"))
+    assert len(json_files) == 1
+    archived = json.loads(json_files[0].read_text(encoding="utf-8"))
+    assert archived["request"]["initial_capital"] == capital
+    assert archived["backtest"]["initial_capital"] == capital

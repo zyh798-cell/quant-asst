@@ -1,4 +1,4 @@
-"""QuantSentinel Web 接口层（Step B）。
+"""Quant Asst Web 接口层（Step B）。
 
 职责边界：
 - 只做 HTTP 编排与 DTO 转换，业务逻辑全部复用 ``core/`` / ``agents/`` / ``report/``；
