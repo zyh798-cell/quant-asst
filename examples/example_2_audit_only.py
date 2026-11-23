@@ -49,7 +49,7 @@ def main() -> int:
     _common.banner("示例 02：单独调用红队审计 + 风控综合（mock 离线模式）")
     print(f"标的       : {SYMBOL}")
     print(f"门控阈值   : {THRESHOLD}")
-    print("模式       : mock 离线（QUANTSENTINEL_LLM_MOCK=1，不消耗 token）")
+    print("模式       : mock 离线（QUANT_ASST_LLM_MOCK=1，不消耗 token）")
 
     settings = _common.settings()
 

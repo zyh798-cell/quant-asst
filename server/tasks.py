@@ -218,7 +218,7 @@ class TaskManager:
                 return
             request: AnalysisCreateRequest = task["_request"]
             env_snapshot = {k: os.environ.get(k) for k in
-                            ("QUANTSENTINEL_LLM_MOCK", "LITELLM_OFFLINE_MODE")}
+                            ("QUANT_ASST_LLM_MOCK", "LITELLM_OFFLINE_MODE")}
             self._set_status(task_id, "running")
             recorder = TrajectoryRecorder(task_id, self._settings.trajectory_dir)
             try:
@@ -637,10 +637,10 @@ class TaskManager:
     def _apply_mode(self, mode: str) -> None:
         """按任务模式设置进程级 LLM 开关（串行执行保证不串扰）。"""
         if mode == "mock":
-            os.environ["QUANTSENTINEL_LLM_MOCK"] = "1"
+            os.environ["QUANT_ASST_LLM_MOCK"] = "1"
             os.environ["LITELLM_OFFLINE_MODE"] = "true"
         else:
-            os.environ.pop("QUANTSENTINEL_LLM_MOCK", None)
+            os.environ.pop("QUANT_ASST_LLM_MOCK", None)
             os.environ.pop("LITELLM_OFFLINE_MODE", None)
 
     def _notice_for(self, request: AnalysisCreateRequest) -> str | None:

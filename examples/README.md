@@ -3,7 +3,7 @@
 5 组可直接运行的示例脚本，用于 GitHub 仓库演示与快速上手。所有示例：
 
 - 硬编码标的与参数，开箱即用；
-- 默认启用 **mock 离线模式**（`QUANTSENTINEL_LLM_MOCK=1`），**无需 LLM 密钥、不消耗 token**；
+- 默认启用 **mock 离线模式**（`QUANT_ASST_LLM_MOCK=1`），**无需 LLM 密钥、不消耗 token**；
 - 仅依赖 `examples/` 目录内的脚本与公共底座 `_common.py`，不改动 `core` / `agents` / `report` 核心业务代码。
 
 > 本项目仅用于教育与研究，不构成投资建议，不含实盘下单功能。
@@ -114,7 +114,7 @@ uv run python examples/example_4_mock_offline.py
 
 ## mock 模式说明
 
-- 示例通过 `examples/_common.py` 在导入 `core` 之前设置 `QUANTSENTINEL_LLM_MOCK=1`，
+- 示例通过 `examples/_common.py` 在导入 `core` 之前设置 `QUANT_ASST_LLM_MOCK=1`，
   由 `MockCompletionBackend` 按 prompt 首行特征词判定角色并返回确定性 JSON。
 - mock 同时设置 `LITELLM_OFFLINE_MODE=true`，禁止 LiteLLM 后台拉取远端 cost 映射，
   从而屏蔽离线场景下的网络重试告警。

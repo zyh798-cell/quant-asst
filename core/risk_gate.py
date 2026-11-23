@@ -3,6 +3,10 @@
 依据红队审计的综合风险级别，对「是否允许生成交易建议」做**确定性**判定。
 本模块不依赖 LLM，保证拦截行为可复现、可单元测试。
 
+**fail-closed 原则**（外部代码 review 要求）：缺失或无法识别的风险等级一律按最高级
+``critical`` 处理并告警，**绝不回落为 low**。归一化由 :func:`core.schemas.normalize_risk_level`
+统一承担（白名单别名 -> 规范级别；白名单外 / 缺失 -> critical）。
+
 拦截规则（对应需求）：
 - 致命（critical）：**禁止生成交易建议** —— ``trade_suggestion_allowed=False``，
   交易建议强制置空，最终决策恒为 ``blocked``，并在报告顶部显著标注风险提示。
@@ -13,14 +17,28 @@
 ``threshold`` 参数允许 CLI 在「高风险」默认线之上进一步收紧，例如设为
 ``medium`` 时，中风险也会触发风险提示与约束边界。致命风险恒被拦截，不受
 ``threshold`` 影响。
+
+blocked 一致性：只要 ``final_decision == "blocked"``（无论 critical 还是
+``tradability == "prohibited"``），交易建议必须清空并写入拦截说明文案，
+避免出现「决策已拦截但建议文本仍在输出」的不一致。
 """
 
 from __future__ import annotations
 
-from core.schemas import RISK_RANK, RiskGate
+import logging
+
+from core.schemas import RISK_RANK, RiskGate, normalize_risk_level
+
+logger = logging.getLogger("quantsentinel.risk")
 
 #: 默认风险阈值：达到或超过该级别即触发风险提示与约束边界
 DEFAULT_RISK_THRESHOLD = "high"
+
+#: blocked 时的交易建议占位文案（替代被清空的建议）
+BLOCKED_ADVISORY_TEXT = (
+    "（交易建议已被风控门控拦截：本策略存在致命缺陷或明确禁止交易，"
+    "禁止生成任何实盘买卖建议）"
+)
 
 
 def _constraints_for(level: str) -> list[str]:
@@ -59,11 +77,11 @@ def apply_risk_gate(
     Returns:
         确定性门控结论（不由 LLM 决定，保证可复现）。
     """
-    level = audit_report.get("overall_risk_level", "low")
-    if level not in RISK_RANK:
-        level = "low"
+    level = normalize_risk_level(audit_report.get("overall_risk_level"))
+    threshold_rank = RISK_RANK.get(
+        normalize_risk_level(threshold), RISK_RANK[DEFAULT_RISK_THRESHOLD]
+    )
     rank = RISK_RANK[level]
-    threshold_rank = RISK_RANK.get(threshold, RISK_RANK[DEFAULT_RISK_THRESHOLD])
 
     allowed = level != "critical"
     banner = ""
@@ -94,9 +112,26 @@ def final_decision(audit_report: dict, debate_verdict: dict | None = None) -> st
     Returns:
         adopt | revise | reject | blocked。
     """
-    if audit_report.get("overall_risk_level") == "critical" or \
-            audit_report.get("tradability") == "prohibited":
+    level = normalize_risk_level(audit_report.get("overall_risk_level"))
+    if level == "critical" or audit_report.get("tradability") == "prohibited":
         return "blocked"
     if debate_verdict and debate_verdict.get("decision"):
         return debate_verdict["decision"]
     return "revise"
+
+
+def advisory_for_decision(decision: str, draft_advisory: str = "") -> str:
+    """按最终决策产出交易建议文本，保证 blocked 与建议内容一致。
+
+    - ``blocked``：一律返回 :data:`BLOCKED_ADVISORY_TEXT`（拦截说明），
+      无论该 blocked 来自 critical 还是 ``tradability == "prohibited"``；
+    - 其他决策：保留 LLM 草稿建议（缺省空串）。
+
+    Args:
+        decision: ``final_decision`` 的结果。
+        draft_advisory: LLM 草稿中的交易建议原文。
+    """
+    if decision == "blocked":
+        logger.warning("最终决策 blocked：交易建议已清空并写入拦截说明")
+        return BLOCKED_ADVISORY_TEXT
+    return draft_advisory or ""

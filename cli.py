@@ -119,10 +119,10 @@ def debate(
     from core.config import get_settings
 
     settings = get_settings()
-    if not no_mock and not os.getenv("QUANTSENTINEL_LLM_MOCK"):
+    if not no_mock and not os.getenv("QUANT_ASST_LLM_MOCK"):
         # 无显式指定且未检测到密钥时自动启用离线 mock，保证 CI/无网可用
         if not secret_exists("DEEPSEEK_API_KEY"):
-            os.environ["QUANTSENTINEL_LLM_MOCK"] = "1"
+            os.environ["QUANT_ASST_LLM_MOCK"] = "1"
             console.print("[yellow]未检测到 DEEPSEEK_API_KEY，已自动切换 mock 离线模式"
                           "（加 --no-mock 可强制真实调用）[/yellow]")
 
@@ -243,9 +243,9 @@ def audit(
     from report.markdown import write_audit_report, write_final_report
 
     settings = get_settings()
-    if not no_mock and not os.getenv("QUANTSENTINEL_LLM_MOCK"):
+    if not no_mock and not os.getenv("QUANT_ASST_LLM_MOCK"):
         if not secret_exists("DEEPSEEK_API_KEY"):
-            os.environ["QUANTSENTINEL_LLM_MOCK"] = "1"
+            os.environ["QUANT_ASST_LLM_MOCK"] = "1"
             console.print("[yellow]未检测到 DEEPSEEK_API_KEY，已自动切换 mock 离线模式"
                           "（加 --no-mock 可强制真实调用）[/yellow]")
 
@@ -338,6 +338,35 @@ def fetch(
     console.print(table)
 
 
+def _load_position_fn(strategy_code: str, strategy_file: Path):
+    """从策略代码中加载 ``generate_positions``（仅静态检查入口是否存在）。
+
+    只解析 AST 校验契约，不执行策略代码；真实执行一律在沙箱内进行。
+    """
+    import ast
+
+    try:
+        tree = ast.parse(strategy_code)
+    except SyntaxError as exc:
+        raise typer.BadParameter(f"{strategy_file} 语法错误：{exc}") from exc
+    if not any(
+        isinstance(node, ast.FunctionDef) and node.name == "generate_positions"
+        for node in tree.body
+    ):
+        raise typer.BadParameter(
+            f"{strategy_file} 未定义 generate_positions(df)，无法执行回测"
+        )
+
+    # 在隔离命名空间中加载策略模块（执行面仍由沙箱承担）
+    import types
+
+    module = types.ModuleType("quantsentinel_strategy_check")
+    module.__file__ = str(strategy_file)
+    code = compile(strategy_code, str(strategy_file), "exec")
+    exec(code, module.__dict__)  # noqa: S102 —— 显式加载用户指定策略文件
+    return module.generate_positions
+
+
 @app.command()
 def backtest(
     symbol_raw: str = typer.Argument("cn:600519", help="回测标的（默认 cn:600519）"),
@@ -349,9 +378,12 @@ def backtest(
     ),
     sandbox: str = typer.Option("local", "--sandbox", help="沙箱模式：docker（Release 默认）| local（开发调试）"),
     capital: float = typer.Option(1_000_000.0, "--capital", help="初始资金"),
+    lookahead_check: bool = typer.Option(
+        False, "--lookahead-check",
+        help="执行前做未来函数确定性检查（截断历史一致性，默认关）",
+    ),
 ) -> None:
     """把策略送入沙箱执行双均线回测（Step 2 链路验证命令）。"""
-    from backtest.market_rules import get_rules
     from core.markets import Symbol
     from tools.backtest_sandbox import run_backtest_in_sandbox
     from tools.market_data import get_backtest_frame
@@ -364,12 +396,31 @@ def backtest(
     symbol = Symbol.parse(symbol_raw)
     strategy_code = strategy_file.read_text(encoding="utf-8")
 
-    with console.status(f"[1/2] 抓取 {symbol.full} 日线 ..."):
+    with console.status(f"[1/3] 抓取 {symbol.full} 日线 ..."):
         df = get_backtest_frame(symbol, start, end, settings)
     console.print(f"    数据：{len(df)} 根 K 线（{df['date'].iloc[0].date()} ~ {df['date'].iloc[-1].date()}）")
 
+    # ---- 未来函数确定性检查（可选，默认关）----
+    if lookahead_check:
+        from backtest.lookahead import (
+            check_lookahead_determinism,
+            format_lookahead_verdict,
+        )
+
+        with console.status("[2/3] 未来函数确定性检查（截断历史重跑）..."):
+            position_fn = _load_position_fn(strategy_code, strategy_file)
+            verdict = check_lookahead_determinism(df, position_fn)
+        console.print(format_lookahead_verdict(verdict, strategy_file.stem))
+        if not verdict.passed:
+            console.print(
+                "[bold red]未来函数确定性检查未通过：策略疑似引用未来数据，"
+                "已中止回测（可通过移除 --lookahead-check 强制运行）。[/bold red]"
+            )
+            raise typer.Exit(code=2)
+
     run_id = f"bt-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}"
-    with console.status(f"[2/2] 沙箱({sandbox})执行回测 ..."):
+    step_no = "3/3" if lookahead_check else "2/2"
+    with console.status(f"[{step_no}] 沙箱({sandbox})执行回测 ..."):
         output = run_backtest_in_sandbox(
             strategy_code, df, symbol, settings,
             mode=sandbox, initial_capital=capital, run_id=run_id,

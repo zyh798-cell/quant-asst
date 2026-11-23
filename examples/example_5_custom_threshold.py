@@ -65,7 +65,7 @@ def main() -> int:
     _common.banner("示例 05：自定义风控阈值演示（medium 严格模式）")
     print(f"标的       : {SYMBOL}")
     print(f"策略描述   : {HYPOTHESIS}")
-    print("模式       : mock 离线（QUANTSENTINEL_LLM_MOCK=1，不消耗 token）")
+    print("模式       : mock 离线（QUANT_ASST_LLM_MOCK=1，不消耗 token）")
 
     settings = _common.settings()
 

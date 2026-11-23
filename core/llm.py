@@ -23,11 +23,23 @@ from typing import Any, TypeVar
 #: mock 模式真值集合（与 :func:`is_mock_mode` 保持一致）
 _MOCK_TRUE_VALUES = {"1", "true", "yes", "on"}
 
+#: mock 模式开关环境变量：新名（品牌统一后）为准，旧名保留向后兼容。
+MOCK_ENV_VAR = "QUANT_ASST_LLM_MOCK"
+MOCK_ENV_VAR_LEGACY = "QUANTSENTINEL_LLM_MOCK"
+
+
+def _mock_flag() -> str:
+    """读取 mock 开关（新名优先，旧名兜底；大小写不敏感）。"""
+    for name in (MOCK_ENV_VAR, MOCK_ENV_VAR_LEGACY):
+        value = (os.getenv(name, "") or "").strip().lower()
+        if value:
+            return value
+    return ""
+
 
 def _enable_offline_mode_if_mock() -> None:
     """mock 模式下于 litellm 导入前开启 LiteLLM 离线开关。"""
-    flag = (os.getenv("QUANTSENTINEL_LLM_MOCK", "") or "").strip().lower()
-    if flag in _MOCK_TRUE_VALUES:
+    if _mock_flag() in _MOCK_TRUE_VALUES:
         os.environ["LITELLM_OFFLINE_MODE"] = "true"
 
 
@@ -74,8 +86,8 @@ _silence_litellm_cost_map_fetch()
 
 
 def is_mock_mode() -> bool:
-    """当前是否处于 mock 离线模式（环境变量 QUANTSENTINEL_LLM_MOCK 为真值）。"""
-    return (os.getenv("QUANTSENTINEL_LLM_MOCK", "") or "").strip().lower() in _MOCK_TRUE_VALUES
+    """当前是否处于 mock 离线模式（``QUANT_ASST_LLM_MOCK`` 或旧名为真值）。"""
+    return _mock_flag() in _MOCK_TRUE_VALUES
 
 
 T = TypeVar("T", bound=StrictModel)
@@ -229,7 +241,8 @@ _CODE_MARKER = "策略代码生成器"
 class MockCompletionBackend:
     """脚本化 LLM 后端：按 **prompt 特征词**返回确定性 JSON，供离线测试与 CI。
 
-    触发：环境变量 ``QUANTSENTINEL_LLM_MOCK`` 取真值（1/true/yes/on）。
+    触发：环境变量 ``QUANT_ASST_LLM_MOCK`` 取真值（1/true/yes/on）；
+    旧名 ``QUANTSENTINEL_LLM_MOCK`` 仍兼容生效。
     仅用于辩论模块等离线场景；真实密钥存在时默认仍走 LiteLLM，不改变既有链路行为。
 
     用法::
@@ -491,14 +504,14 @@ def _mock_verdict_payload(messages: list[dict[str, str]]) -> dict:
 def get_completion_backend(settings: Settings | None = None):
     """返回 LLM 补全后端：mock 模式（环境变量开启）或真实 LiteLLM。
 
-    mock 判据：``QUANTSENTINEL_LLM_MOCK`` 为真值（1/true/yes/on，大小写不敏感）。
+    mock 判据：``QUANT_ASST_LLM_MOCK`` 为真值（1/true/yes/on，大小写不敏感）；
+    旧名 ``QUANTSENTINEL_LLM_MOCK`` 仍兼容生效。
     关闭时返回一个转发到 ``litellm.completion`` 的轻量适配器，保持调用侧代码不变。
 
     mock 模式同时设置 ``LITELLM_OFFLINE_MODE=true``，禁止 LiteLLM 拉取任何远端
     目录（模型价格表 / tokenizer / catalog），确保完全离线、无网络重试告警。
     """
-    flag = (os.getenv("QUANTSENTINEL_LLM_MOCK", "") or "").strip().lower()
-    if flag in _MOCK_TRUE_VALUES:
+    if _mock_flag() in _MOCK_TRUE_VALUES:
         # 强制开启（覆盖可能的外部注入），确保 LiteLLM 完全离线
         os.environ["LITELLM_OFFLINE_MODE"] = "true"
         return MockCompletionBackend()

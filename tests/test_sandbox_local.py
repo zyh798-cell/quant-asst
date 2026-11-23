@@ -1,10 +1,14 @@
-"""本地受限沙箱测试：AST 安检、正常执行、超时强杀、内存限额。"""
+"""本地受限沙箱测试：AST 安检、正常执行、超时强杀、内存限额、密钥隔离。"""
 
 from __future__ import annotations
 
 import pytest
 
-from tools.sandbox_local import LocalRestrictedSandbox
+from tools.sandbox_local import (
+    LocalRestrictedSandbox,
+    build_sandbox_env,
+    is_secret_like_name,
+)
 
 
 @pytest.fixture()
@@ -60,6 +64,96 @@ def test_audit_allows_relative_open_and_numpy(local_sandbox: LocalRestrictedSand
 
 def test_audit_rejects_syntax_error(local_sandbox: LocalRestrictedSandbox) -> None:
     assert "语法错误" in local_sandbox.audit_strategy("def broken(:\n")[0]
+
+
+# ---------------------------------------------------------------------------
+# 密钥隔离（外部代码 review 第 3 项）
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name,expected", [
+    ("DEEPSEEK_API_KEY", True),
+    ("OPENAI_API_KEY", True),
+    ("GITHUB_TOKEN", True),
+    ("AWS_SECRET_ACCESS_KEY", True),
+    ("SSH_PRIVATE_KEY", True),
+    ("MY_SECRET", True),
+    ("PATH", False),
+    ("PYTHONPATH", False),
+    ("HOME", False),
+])
+def test_is_secret_like_name(name, expected) -> None:
+    assert is_secret_like_name(name) is expected
+
+
+def test_build_sandbox_env_strips_secret_keys(monkeypatch) -> None:
+    """含 DEEPSEEK_API_KEY 的宿主环境不得透传进沙箱子进程。"""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-must-not-leak")
+    monkeypatch.setenv("PATH", r"C:\Windows\System32")
+    env = build_sandbox_env({"PYTHONPATH": "/project"})
+    assert "DEEPSEEK_API_KEY" not in env
+    assert env["PATH"] == r"C:\Windows\System32"      # 白名单保留
+    assert env["PYTHONPATH"] == "/project"            # 运行必需注入保留
+
+
+def test_build_sandbox_env_rejects_secret_extra() -> None:
+    """显式注入的密钥类变量同样被拒绝。"""
+    env = build_sandbox_env({"DEEPSEEK_API_KEY": "sk-x", "SAFE_VAR": "ok"})
+    assert "DEEPSEEK_API_KEY" not in env
+    assert env["SAFE_VAR"] == "ok"
+
+
+def test_subprocess_env_excludes_api_key(local_sandbox, test_settings, monkeypatch, tmp_path):
+    """端到端：runner 子进程内读到的环境变量中不存在宿主 API Key。
+
+    策略代码不能 ``import os``（AST 安检会拦截），故由宿主生成的可信
+    runner 读取 ``os.environ`` 落盘，再断言其中无密钥类变量。
+    """
+    import json
+
+    import pandas as pd
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-must-not-leak")
+
+    workdir = tmp_path / "work"
+    workdir.mkdir()
+    # runner 由宿主生成，属可信代码：执行前把「当前子进程的 KEY 类环境变量」
+    # 落盘为 env_dump.json，策略只需确认文件为空对象。
+    runner = (
+        "import json\n"
+        "import os\n"
+        "with open('env_snapshot.json', 'w', encoding='utf-8') as f:\n"
+        "    json.dump(dict(os.environ), f)\n"
+    )
+    (workdir / "runner.py").write_text(runner, encoding="utf-8")
+    n = 10
+    df = pd.DataFrame({
+        "date": pd.bdate_range("2024-01-01", periods=n),
+        "open": 10.0, "high": 10.0, "low": 10.0, "close": 10.0,
+        "volume": 1e6, "amount": 1e7, "suspended": False,
+        "limit_up": float("nan"), "limit_down": float("nan"),
+    })
+    df.to_parquet(workdir / "data.parquet", index=False)
+    from backtest.market_rules import get_rules
+    from core.markets import Symbol
+
+    symbol = Symbol.parse("us:AAPL")
+    rules = get_rules(symbol.market)
+    (workdir / "spec.json").write_text(
+        json.dumps({"rules": rules.dump(), "initial_capital": 1_000_000.0,
+                    "train_ratio": 0.7, "periods_per_year": 252}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (workdir / "strategy.py").write_text(
+        "def generate_positions(df):\n    return df['close'] * 0.0\n", encoding="utf-8"
+    )
+
+    result = local_sandbox.execute(workdir)
+    assert result.exit_code == 0, result.stderr[-2000:]
+    dumped = json.loads((workdir / "env_snapshot.json").read_text(encoding="utf-8"))
+    keys_like_secret = {k: v for k, v in dumped.items()
+                        if any(m in k.upper() for m in ("KEY", "TOKEN", "SECRET", "PRIVATE"))}
+    assert "DEEPSEEK_API_KEY" not in dumped
+    assert keys_like_secret == {}, f"子进程不应含任何密钥类变量，实际：{keys_like_secret}"
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +281,7 @@ def test_execute_memory_limit_kill(test_settings) -> None:
 # 端到端回归：策略输出对齐 / 零成交诊断
 # ---------------------------------------------------------------------------
 
-def _trending_frame(n: int = 30) -> "pd.DataFrame":
+def _trending_frame(n: int = 30):
     """前 10 天 10 元、之后 12 元的趋势数据（MA3 上穿 MA5）。"""
     import numpy as np
     import pandas as pd

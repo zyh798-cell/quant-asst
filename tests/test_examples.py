@@ -34,7 +34,7 @@ _CASES = [
 def _run_example(script: str, timeout: int) -> subprocess.CompletedProcess:
     """在项目根目录以子进程运行示例脚本（mock 离线模式）。"""
     env = dict(os.environ)
-    env["QUANTSENTINEL_LLM_MOCK"] = "1"
+    env["QUANT_ASST_LLM_MOCK"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run(
         [sys.executable, str(EXAMPLES / script)],
@@ -65,7 +65,7 @@ def test_example_runs(script: str, keywords: list[str], timeout: int) -> None:
 def test_common_helper_is_mock_by_default() -> None:
     """共享底座默认启用 mock 离线模式（不依赖密钥）。"""
     env = dict(os.environ)
-    env.pop("QUANTSENTINEL_LLM_MOCK", None)  # 移除后由 _common 的 setdefault 兜底
+    env.pop("QUANT_ASST_LLM_MOCK", None)  # 移除后由 _common 的 setdefault 兜底
     env["PYTHONIOENCODING"] = "utf-8"
     code = (
         "import sys; sys.path.insert(0, r'" + str(EXAMPLES) + "');"

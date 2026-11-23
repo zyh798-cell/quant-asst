@@ -23,7 +23,7 @@
     - 回测标的 cn:600519 使用本地缓存区间（2024-11-17 ~ 2026-11-17）；
       若本地无缓存会经 AkShare 联网抓取。
     - HTML 报告内嵌 plotly.js（约 4.8 MB 单文件），浏览器直接打开即可交互浏览。
-    - 如需真实 LLM，删除 examples/_common.py 顶部的 QUANTSENTINEL_LLM_MOCK 设置，
+    - 如需真实 LLM，删除 examples/_common.py 顶部的 QUANT_ASST_LLM_MOCK 设置，
       并在 .env 配置有效 DEEPSEEK_API_KEY。
 """
 
@@ -50,7 +50,7 @@ def main() -> int:
     print(f"标的       : {SYMBOL}")
     print(f"策略描述   : {HYPOTHESIS}")
     print(f"门控阈值   : {THRESHOLD}")
-    print("模式       : mock 离线（QUANTSENTINEL_LLM_MOCK=1，不消耗 token）")
+    print("模式       : mock 离线（QUANT_ASST_LLM_MOCK=1，不消耗 token）")
 
     settings = _common.settings()
 

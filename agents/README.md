@@ -147,7 +147,7 @@ uv run python cli.py debate "宁德时代双均线策略，5日线上穿20日线
 uv run python cli.py debate "双均线策略" --symbol cn:300750 --rounds 2
 
 # 离线 mock 模式（不调用真实 LLM，CI 可用）
-QUANTSENTINEL_LLM_MOCK=1 uv run python cli.py debate "双均线策略" --symbol cn:300750
+QUANT_ASST_LLM_MOCK=1 uv run python cli.py debate "双均线策略" --symbol cn:300750
 
 # 强制真实 LLM（缺省在未检测到 DEEPSEEK_API_KEY 时自动启用 mock）
 uv run python cli.py debate "双均线策略" --symbol cn:300750 --no-mock
@@ -171,11 +171,11 @@ uv run python cli.py debate "双均线策略" --symbol cn:300750 --no-mock
 | `--symbol` / `-s` | — | 由假设解析推断 | 标的，格式 `<market>:<code>` |
 | `--market` / `-m` | `default_market` | `cn_stock` | 市场前缀 cn/us/hk/futures/crypto |
 | `--no-mock` | — | 关闭 | 强制真实 LLM 调用 |
-| `QUANTSENTINEL_LLM_MOCK` | 环境变量 | 未设置 | 置 1/true/yes/on 启用脚本化离线后端 |
+| `QUANT_ASST_LLM_MOCK` | 环境变量 | 未设置 | 置 1/true/yes/on 启用脚本化离线后端 |
 
 ## Mock 离线模式
 
-`QUANTSENTINEL_LLM_MOCK=1` 时，`core.llm.get_completion_backend()` 返回
+`QUANT_ASST_LLM_MOCK=1` 时，`core.llm.get_completion_backend()` 返回
 `MockCompletionBackend`：按 prompt 首行特征词判定角色（多头分析师/空头分析师/
 风控核验/最终裁决员/红队审计员/风控综合官等），返回确定性且 schema 合法的占位 JSON。
 用于单元测试与 CI，不产生任何网络请求与真实模型消耗。真实密钥存在且未显式指定时仍走 LiteLLM。

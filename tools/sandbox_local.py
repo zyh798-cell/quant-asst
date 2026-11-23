@@ -10,7 +10,14 @@
    禁止 eval/exec/compile/__import__；open() 仅允许相对路径且不得逃逸出工作区；
 2. **独立子进程**：策略代码在独立 Python 进程执行，异常/崩溃不影响宿主；
 3. **资源限额**：超时强杀 + psutil 轮询进程树内存、超限强杀；
-4. **文件限制**：工作目录锁定沙箱工作区（cwd），数据以只读 Parquet 预置。
+4. **文件限制**：工作目录锁定沙箱工作区（cwd），数据以只读 Parquet 预置；
+5. **密钥隔离**：环境变量白名单透传，名称含 KEY/TOKEN/SECRET/PRIVATE 的
+   宿主密钥一律不进子进程（见 ``build_sandbox_env``）。
+
+⚠️ **定位声明**：local 沙箱只是**缓释措施**，不是硬安全边界——
+静态安检可被动态导入/编码混淆绕过，进程与文件系统均未真正隔离。
+执行**不可信策略代码必须使用 Docker 沙箱**（禁网 + 最小只读挂载 +
+非 root + 资源限额 + 用后即毁）。
 """
 
 from __future__ import annotations
@@ -52,6 +59,48 @@ BLOCKED_MODULES: frozenset[str] = frozenset({
 BLOCKED_BUILTINS: frozenset[str] = frozenset({
     "eval", "exec", "compile", "__import__", "breakpoint", "globals", "locals",
 })
+
+#: 允许透传给沙箱子进程的环境变量白名单（仅解释器/运行必需项）。
+#: 其余一律剔除，尤其任何名称含 KEY/TOKEN/SECRET/PRIVATE 的密钥类变量。
+_ALLOWED_ENV_KEYS: frozenset[str] = frozenset({
+    "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "TEMP", "TMP",
+    "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+    "PYTHONPATH", "PYTHONIOENCODING", "LANG", "LC_ALL", "LC_CTYPE",
+})
+
+#: 密钥类变量名特征（大小写不敏感；命中即剔除）
+_SECRET_NAME_MARKERS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PRIVATE")
+
+
+def build_sandbox_env(extra: dict[str, str] | None = None) -> dict[str, str]:
+    """构造沙箱子进程环境变量（白名单透传，密钥类一律剔除）。
+
+    外部代码 review 第 3 项：local 沙箱此前 ``{**os.environ, ...}`` 整体透传，
+    会把宿主的 ``DEEPSEEK_API_KEY`` / 各类 TOKEN 直接暴露给不可信策略代码。
+    现改为白名单 + 密钥特征双重过滤。
+
+    Args:
+        extra: 额外注入的运行必需变量（如 PYTHONPATH），不受白名单限制但会
+            经过密钥特征检查。
+
+    Returns:
+        过滤后的环境变量字典。
+    """
+    env = {k: v for k, v in os.environ.items() if k in _ALLOWED_ENV_KEYS}
+    if extra:
+        for key, value in extra.items():
+            upper = key.upper()
+            if any(marker in upper for marker in _SECRET_NAME_MARKERS):
+                logger.warning("拒绝向沙箱子进程注入疑似密钥变量：%s", key)
+                continue
+            env[key] = value
+    return env
+
+
+def is_secret_like_name(name: str) -> bool:
+    """判断变量名是否属于密钥类（含 KEY/TOKEN/SECRET/PRIVATE 任一特征）。"""
+    upper = name.upper()
+    return any(marker in upper for marker in _SECRET_NAME_MARKERS)
 
 
 def _parse_memory(limit: str) -> int:
@@ -167,7 +216,7 @@ class LocalRestrictedSandbox(SandboxExecutor):
                     "策略代码未通过本地沙箱静态安检：\n" + "\n".join(violations)
                 )
 
-        env = {**os.environ, "PYTHONPATH": str(self._project_root())}
+        env = build_sandbox_env({"PYTHONPATH": str(self._project_root())})
         proc = subprocess.Popen(
             [sys.executable, "-B", entrypoint],
             cwd=str(workdir),

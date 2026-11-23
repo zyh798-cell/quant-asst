@@ -24,6 +24,7 @@ def _clean_key_env(monkeypatch):
     """清空全部已知密钥环境变量，保证测试可重复（不受本机 .env 影响）。"""
     for name in KNOWN_LLM_KEYS:
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("QUANT_ASST_LLM_MOCK", raising=False)
     monkeypatch.delenv("QUANTSENTINEL_LLM_MOCK", raising=False)
     monkeypatch.delenv("LITELLM_OFFLINE_MODE", raising=False)
 
@@ -90,12 +91,46 @@ def test_mock_mode_enables_litellm_offline(monkeypatch):
 
 
 def test_real_mode_does_not_force_offline(monkeypatch):
+    monkeypatch.delenv("QUANT_ASST_LLM_MOCK", raising=False)
     monkeypatch.delenv("QUANTSENTINEL_LLM_MOCK", raising=False)
     assert llm.is_mock_mode() is False
 
     backend = llm.get_completion_backend()
     assert not isinstance(backend, llm.MockCompletionBackend)
     assert os.environ.get("LITELLM_OFFLINE_MODE") is None
+
+
+# ---------------------------------------------------------------------------
+# mock 开关命名兼容（外部代码 review 第 5 项）
+# ---------------------------------------------------------------------------
+
+def test_new_mock_env_var_is_primary(monkeypatch):
+    """新名 QUANT_ASST_LLM_MOCK 生效。"""
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
+    monkeypatch.delenv("QUANTSENTINEL_LLM_MOCK", raising=False)
+    assert llm.is_mock_mode() is True
+    assert isinstance(llm.get_completion_backend(), llm.MockCompletionBackend)
+
+
+def test_legacy_mock_env_var_still_supported(monkeypatch):
+    """旧名 QUANTSENTINEL_LLM_MOCK 仍向后兼容生效。"""
+    monkeypatch.delenv("QUANT_ASST_LLM_MOCK", raising=False)
+    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "true")
+    assert llm.is_mock_mode() is True
+    assert isinstance(llm.get_completion_backend(), llm.MockCompletionBackend)
+
+
+def test_new_name_wins_when_both_set(monkeypatch):
+    """两个都设时以新名为准（避免旧值意外关闭 mock）。"""
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "0")
+    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "1")
+    assert llm.is_mock_mode() is False
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES", "On"])
+def test_mock_true_values_case_insensitive(monkeypatch, value):
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", value)
+    assert llm.is_mock_mode() is True
 
 
 def test_cli_startup_prints_key_status_without_value(monkeypatch):

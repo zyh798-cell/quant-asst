@@ -4,7 +4,7 @@
 本模块是 5 个示例脚本的公共底座，职责：
 
 1. **默认启用 mock 离线模式**：在导入 ``core``（其间接导入 litellm）之前设置
-   ``QUANTSENTINEL_LLM_MOCK=1``，保证示例无需 LLM 密钥、不消耗 token、可重复执行。
+   ``QUANT_ASST_LLM_MOCK=1``，保证示例无需 LLM 密钥、不消耗 token、可重复执行。
    若调用方已显式设置该变量（真值或假值），则尊重调用方设置，不覆盖。
 2. **路径与配置**：把项目根加入 ``sys.path`` 并统一工作目录为项目根，
    提供 ``get_settings`` 封装，保证 ``output/``、``var/``、``.env`` 等相对路径
@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 # ---- mock 开关（必须在导入 core / litellm 之前设置）----
-# QUANTSENTINEL_LLM_MOCK 优先级：
+# QUANT_ASST_LLM_MOCK 优先级：
 #   - 真值（1/true/yes/on，大小写不敏感）：启用 mock 离线模式，**跳过真实 LLM 调用**，
 #     由 MockCompletionBackend 读取本地预生成的样例输出（确定性、schema 合法），
 #     不消耗 token，无需任何 API 密钥；
@@ -36,7 +36,7 @@ from typing import Any
 #   - 未设置：示例用 setdefault 兜底为 "1"（开箱即用、零密钥）。
 # 该判据在 core.llm 运行时读取，且 mock 模式会同时设置 LITELLM_OFFLINE_MODE=true，
 # 禁止 LiteLLM 后台拉取远端 cost 映射。
-os.environ.setdefault("QUANTSENTINEL_LLM_MOCK", "1")
+os.environ.setdefault("QUANT_ASST_LLM_MOCK", "1")
 
 #: 项目根目录（QuantSentinel/）
 ROOT = Path(__file__).resolve().parent.parent

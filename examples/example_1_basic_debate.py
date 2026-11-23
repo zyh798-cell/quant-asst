@@ -45,7 +45,7 @@ def main() -> int:
     print(f"标的       : {SYMBOL}")
     print(f"策略描述   : {HYPOTHESIS}")
     print(f"辩论轮次   : {ROUNDS}")
-    print("模式       : mock 离线（QUANTSENTINEL_LLM_MOCK=1，不消耗 token）")
+    print("模式       : mock 离线（QUANT_ASST_LLM_MOCK=1，不消耗 token）")
 
     settings = _common.settings()
 

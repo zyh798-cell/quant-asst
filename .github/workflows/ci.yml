@@ -32,7 +32,7 @@ jobs:
       - name: Run tests (offline)
         env:
           # 单元测试用 monkeypatch 替换 litellm.completion，无需真实密钥；
-          # 示例测试由 tests/test_examples.py 在子进程内自设 QUANTSENTINEL_LLM_MOCK=1。
+          # 示例测试由 tests/test_examples.py 在子进程内自设 QUANT_ASST_LLM_MOCK=1。
           # 不在此处注入全局 mock：否则会切换到 MockCompletionBackend，
           # 使依赖 litellm.completion 注入的单元测试收不到响应而失败。
           LITELLM_OFFLINE_MODE: "true"

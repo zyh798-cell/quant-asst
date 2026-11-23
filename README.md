@@ -13,7 +13,7 @@
     <img src="https://github.com/zyh798-cell/quant-asst/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
   <a href="https://github.com/zyh798-cell/quant-asst">
-    <img src="https://img.shields.io/badge/zyh798--cell%2Fquant--ast-3776ab" alt="zyh798-cell/quant-asst">
+    <img src="https://img.shields.io/badge/zyh798--cell%2Fquant--asst-3776ab" alt="zyh798-cell/quant-asst">
   </a>
   <a href="https://zyh798-cell.github.io/quant-asst/">
     <img src="https://img.shields.io/badge/在线演示-Live-18A67C" alt="在线演示">
@@ -80,7 +80,7 @@ uv run python cli.py run "双均线策略，5日线上穿20日线买入，死叉
 | `debate` | 多智能体多空辩论，输出逐轮辩论 + 风控核验 + 裁决结论与修订建议。 |
 | `audit` | 对已有辩论报告执行红队审计 + 风控综合，产出审计报告与最终量化分析报告。 |
 | `fetch` | 抓取日线行情并写入本地 Parquet / DuckDB 缓存。 |
-| `backtest` | 把策略文件送入沙箱执行回测，验证引擎链路。 |
+| `backtest` | 把策略文件送入沙箱执行回测，验证引擎链路；加 `--lookahead-check` 先做未来函数确定性检查（默认关）。 |
 | `doctor` | 环境自检：配置、依赖、Docker、Qdrant、运行时目录。 |
 | `settings` | 打印当前生效配置（不含任何密钥）。 |
 
@@ -184,7 +184,7 @@ npm run dev        # http://localhost:5173
 | `GET` | `/api/analyses/{id}/report?format=md\|html` | 报告正文，`Content-Type` 为 `text/markdown` 或 `text/html` |
 | `GET` | `/api/health` | 健康检查，返回 `{"status":"ok","mode":"mock\|real"}` |
 
-任务状态机：`pending → running → stage_done → completed`，异常转 `failed` 并写入脱敏后的错误信息；六个阶段 `parse → backtest → debate → audit → risk → report` 各自独立记录 `pending / running / done / failed / skipped` 与结构化产物。任务执行串行化，保证进程级 `QUANTSENTINEL_LLM_MOCK` / `LITELLM_OFFLINE_MODE` 不与并发任务互串。报告落盘于 `var/reports/<task_id>/`（Markdown + JSON + 单文件 HTML）。
+任务状态机：`pending → running → stage_done → completed`，异常转 `failed` 并写入脱敏后的错误信息；六个阶段 `parse → backtest → debate → audit → risk → report` 各自独立记录 `pending / running / done / failed / skipped` 与结构化产物。任务执行串行化，保证进程级 `QUANT_ASST_LLM_MOCK` / `LITELLM_OFFLINE_MODE` 不与并发任务互串。报告落盘于 `var/reports/<task_id>/`（Markdown + JSON + 单文件 HTML）。
 
 ### 素材与裂图根因
 

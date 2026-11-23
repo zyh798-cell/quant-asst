@@ -10,13 +10,83 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+#: 规范风险级别（Pydantic Literal 约束；原始值在 validator 中先归一化）
+RiskLevel = Literal["low", "medium", "high", "critical"]
 
 
 class StrictModel(BaseModel):
     """全部 Agent 输出 schema 的基类：禁止额外字段，保证 trajectory 可回放。"""
 
     model_config = ConfigDict(extra="forbid")
+
+
+# ---------------------------------------------------------------------------
+# 风险定级归一化（fail-closed）
+# ---------------------------------------------------------------------------
+
+#: 风险定级（低 -> 致命，单调递增）
+RISK_LEVELS: tuple[str, ...] = ("low", "medium", "high", "critical")
+
+#: 风险级别 -> 中文标签
+RISK_LABELS_ZH: dict[str, str] = {
+    "low": "低", "medium": "中", "high": "高", "critical": "致命",
+}
+
+#: 风险级别排序（用于取最高级别）
+RISK_RANK: dict[str, int] = {lvl: i for i, lvl in enumerate(RISK_LEVELS, start=1)}
+
+#: LLM 原始输出 -> 规范级别 的白名单别名表（含常见英文/中文写法）。
+#: 白名单外或缺失一律按最高级 critical 处理（fail-closed），绝不回落 low。
+RISK_LEVEL_ALIASES: dict[str, str] = {
+    # 英文别名
+    "critical": "critical", "fatal": "critical", "severe": "critical",
+    "catastrophic": "critical", "blocker": "critical",
+    "high": "high",
+    "medium": "medium", "moderate": "medium", "mid": "medium",
+    "low": "low", "minor": "low", "trivial": "low", "negligible": "low",
+    # 中文别名
+    "致命": "critical", "严重": "critical", "极高": "critical", "危急": "critical",
+    "高": "high", "较高": "high",
+    "中": "medium", "中等": "medium", "适中": "medium",
+    "低": "low", "较低": "low", "轻微": "low",
+}
+
+
+def normalize_risk_level(raw: object) -> str:
+    """把任意 LLM 输出的风险等级归一化为 ``RISK_LEVELS`` 之一（fail-closed）。
+
+    规则（外部代码 review 要求）：
+    - 白名单别名命中 -> 对应级别；
+    - **白名单外、缺失、空串、非字符串** 一律返回最高级 ``"critical"``，
+      并记录告警日志，绝不回落为 ``low``。
+
+    Args:
+        raw: 原始值（可能是 None / 中文 / 英文别名 / 已规范化的级别）。
+
+    Returns:
+        ``"low" | "medium" | "high" | "critical"``。
+    """
+    import logging
+
+    logger = logging.getLogger("quantsentinel.risk")
+    if not isinstance(raw, str) or not raw.strip():
+        logger.warning(
+            "风险定级缺失或非法（raw=%r），按 fail-closed 处理为 critical", raw
+        )
+        return "critical"
+    key = raw.strip().lower()
+    normalized = RISK_LEVEL_ALIASES.get(key)
+    if normalized is None:
+        logger.warning(
+            "风险定级 %r 不在白名单内，按 fail-closed 处理为 critical", raw
+        )
+        return "critical"
+    return normalized
+
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +227,12 @@ class RiskFinding(StrictModel):
     severity: str = Field(description="严重级别：low | medium | high")
     falsifiable: bool = Field(description="是否可证伪（不可证伪的主观猜想应被剔除）")
 
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _normalize_severity(cls, v: object) -> str:
+        """严重级别白名单外一律按 critical 处理（fail-closed，不回落 low）。"""
+        return normalize_risk_level(v)
+
 
 class RiskCheckReport(StrictModel):
     """风控核验 Agent 输出（中立，不站队）。
@@ -234,18 +310,6 @@ class DebateOutcome(StrictModel):
 # 红队审计 + 风控门控（Step 5：RedTeam / RiskOfficer）
 # ---------------------------------------------------------------------------
 
-#: 风险定级（低 -> 致命，单调递增）
-RISK_LEVELS: tuple[str, ...] = ("low", "medium", "high", "critical")
-
-#: 风险级别 -> 中文标签
-RISK_LABELS_ZH: dict[str, str] = {
-    "low": "低", "medium": "中", "high": "高", "critical": "致命",
-}
-
-#: 风险级别排序（用于取最高级别）
-RISK_RANK: dict[str, int] = {lvl: i for i, lvl in enumerate(RISK_LEVELS, start=1)}
-
-
 class AuditFinding(StrictModel):
     """红队审计单条发现（按风险类别 + 定级）。"""
 
@@ -258,9 +322,15 @@ class AuditFinding(StrictModel):
     )
     title: str = Field(description="问题一句话标题")
     description: str = Field(description="问题详细描述")
-    severity: str = Field(description="风险定级：low | medium | high | critical")
+    severity: RiskLevel = Field(description="风险定级：low | medium | high | critical")
     evidence: str = Field(description="支撑证据（引用回测指标字段 / 公开数据 / 逻辑推导）")
     recommendation: str = Field(description="修复或缓解建议")
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _normalize_severity(cls, v: object) -> str:
+        """LLM 原始严重级别先归一化（白名单外 -> critical，fail-closed）。"""
+        return normalize_risk_level(v)
 
 
 class AuditReport(StrictModel):
@@ -271,10 +341,17 @@ class AuditReport(StrictModel):
     strategy_name: str = Field(default="", description="被审计的策略名称")
     audit_run_id: str = Field(description="本次审计 run_id")
     source_run_id: str = Field(default="", description="被审计的辩论 run_id")
-    overall_risk_level: str = Field(
-        description="综合风险定级：取全部发现中的最高级别（low|medium|high|critical）"
+    overall_risk_level: RiskLevel = Field(
+        default="critical",
+        description=(
+            "综合风险定级：取全部发现中的最高级别（low|medium|high|critical）；"
+            "LLM 缺失或给出白名单外写法时按 fail-closed 处理为 critical"
+        ),
     )
-    risk_grade_label: str = Field(description="综合风险定级中文标签：低|中|高|致命")
+    risk_grade_label: str = Field(
+        default="致命",
+        description="综合风险定级中文标签：低|中|高|致命（缺失时按级别自动回填）",
+    )
     findings: list[AuditFinding] = Field(
         default_factory=list, description="审计发现清单（按严重级别排序）"
     )
@@ -283,11 +360,26 @@ class AuditReport(StrictModel):
         description="据此生成交易建议的可行性：allowed | restricted | prohibited"
     )
 
+    @field_validator("overall_risk_level", mode="before")
+    @classmethod
+    def _normalize_overall_level(cls, v: object) -> str:
+        """LLM 原始综合定级先归一化（缺失/白名单外 -> critical，绝不回落 low）。"""
+        return normalize_risk_level(v)
+
+    @field_validator("risk_grade_label", mode="before")
+    @classmethod
+    def _fill_risk_grade_label(cls, v: object, info) -> str:
+        """未给出中文标签时按已归一化的级别自动回填，保证报告文案一致。"""
+        if isinstance(v, str) and v.strip():
+            return v
+        level = info.data.get("overall_risk_level")
+        return RISK_LABELS_ZH.get(level, "致命") if level else "致命"
+
 
 class RiskGate(StrictModel):
     """风控门控结论（确定性规则产出，不由 LLM 决定，保证拦截可复现）。"""
 
-    risk_level: str = Field(description="采用的综合风险定级（来自审计 overall_risk_level）")
+    risk_level: RiskLevel = Field(description="采用的综合风险定级（来自审计 overall_risk_level）")
     trade_suggestion_allowed: bool = Field(
         description="是否允许生成交易建议（致命风险恒为 False）"
     )
@@ -304,13 +396,18 @@ class RiskGate(StrictModel):
 class FinalAnalysisDraft(StrictModel):
     """RiskOfficerAgent 的 LLM 输出（分析部分；门控与最终决策由流水线确定性填充）。"""
 
+    @field_validator("overall_risk_level", mode="before")
+    @classmethod
+    def _normalize_overall_level(cls, v: object) -> str:
+        return normalize_risk_level(v)
+
     symbol: str = Field(description="标的")
     market: str = Field(description="市场枚举值")
     strategy_name: str = Field(default="", description="策略名称")
     debate_run_id: str = Field(default="", description="被综合的辩论 run_id")
     audit_run_id: str = Field(default="", description="被综合的审计 run_id")
     credibility_score: int = Field(ge=0, le=100, description="策略可信度打分（0~100）")
-    overall_risk_level: str = Field(description="综合风险定级（low|medium|high|critical）")
+    overall_risk_level: RiskLevel = Field(description="综合风险定级（low|medium|high|critical）")
     executive_summary: str = Field(description="执行摘要（一段话）")
     key_findings: list[str] = Field(
         default_factory=list, description="关键风险发现（引用审计高定级条目）"
@@ -327,6 +424,11 @@ class FinalAnalysisDraft(StrictModel):
 class FinalAnalysisReport(StrictModel):
     """最终量化分析报告（RiskOfficerAgent 分析草稿 + 确定性风控门控）。"""
 
+    @field_validator("overall_risk_level", mode="before")
+    @classmethod
+    def _normalize_overall_level(cls, v: object) -> str:
+        return normalize_risk_level(v)
+
     symbol: str = Field(description="标的")
     market: str = Field(description="市场枚举值")
     strategy_name: str = Field(default="", description="策略名称")
@@ -336,7 +438,7 @@ class FinalAnalysisReport(StrictModel):
         description="最终决策：adopt | revise | reject | blocked（致命风险恒为 blocked）"
     )
     credibility_score: int = Field(ge=0, le=100, description="策略可信度打分（0~100）")
-    overall_risk_level: str = Field(description="综合风险定级")
+    overall_risk_level: RiskLevel = Field(description="综合风险定级")
     risk_gate: RiskGate = Field(description="风控门控结论")
     executive_summary: str = Field(description="执行摘要")
     key_findings: list[str] = Field(default_factory=list, description="关键风险发现")

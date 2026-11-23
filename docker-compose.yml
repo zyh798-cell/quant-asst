@@ -5,7 +5,7 @@
 #   docker compose build sandbox     # 构建回测沙箱镜像
 #
 # 说明：沙箱不常驻运行 —— tools/backtest_sandbox.py 会在每次执行 LLM 生成代码时
-# 以 quantsentinel-sandbox:latest 镜像创建一次性容器（禁网 + 资源限额），用完即毁。
+# 以 quant-asst-sandbox:latest 镜像创建一次性容器（禁网 + 资源限额），用完即毁。
 # 此处的 sandbox 服务仅用于构建与校验镜像，故置于 profile 中，up 不会启动它。
 
 services:
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sandbox
-    image: quantsentinel-sandbox:latest
+    image: quant-asst-sandbox:latest
     entrypoint: ["python", "-c", "print('quantsentinel sandbox image ready')"]
     profiles: ["sandbox"]
 

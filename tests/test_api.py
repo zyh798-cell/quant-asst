@@ -59,10 +59,10 @@ def client(test_settings, monkeypatch):
     """mock 模式 + 隔离配置的客户端。
 
     teardown 等待后台任务全部进入终态，避免后台线程跨测试修改进程级
-    LLM 开关（QUANTSENTINEL_LLM_MOCK）污染后续用例。
+    LLM 开关（QUANT_ASST_LLM_MOCK）污染后续用例。
     """
     _seed_market_cache(test_settings)
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "1")
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
     manager = TaskManager(settings=test_settings)
     yield TestClient(create_app(manager=manager))
     manager.wait_all()
@@ -169,7 +169,8 @@ def test_stage_artifacts_structure(client: TestClient) -> None:
     # 致命风险必须拦截交易建议（确定性门控）
     if audit["overall_risk_level"] == "critical":
         assert risk["risk_gate"]["trade_suggestion_allowed"] is False
-        assert risk["final_report"]["trade_advisory"] == ""
+        # blocked 一致性：建议改为拦截说明文案，不输出可执行内容
+        assert "已拦截" in risk["final_report"]["trade_advisory"]
         assert risk["final_report"]["final_decision"] == "blocked"
 
     assert stages["report"]["data"]["report"]["markdown_path"]

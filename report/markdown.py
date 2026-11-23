@@ -296,8 +296,15 @@ def render_final_markdown(final_report: dict[str, Any]) -> str:
         lines.append("")
 
     if blocked:
+        # blocked 可能来自 critical，也可能来自 tradability=prohibited；
+        # 文案据实说明触发路径，不写死「致命」。
+        trigger = (
+            "综合风险定级为致命（critical）"
+            if final_report.get("overall_risk_level") == "critical"
+            else "交易可行性被判定为禁止（prohibited）"
+        )
         lines.extend([
-            "> **本报告已拦截交易建议生成**：综合风险定级为致命（critical），"
+            f"> **本报告已拦截交易建议生成**：{trigger}，"
             "在缺陷修复并重新通过红队审计前，不输出任何可执行交易建议。",
             "",
         ])
@@ -333,7 +340,8 @@ def render_final_markdown(final_report: dict[str, Any]) -> str:
 
     advisory = final_report.get("trade_advisory") or ""
     lines.append("## 交易建议\n")
-    if blocked or not advisory:
+    # blocked 时门控写入拦截说明文案，直接呈现；仅当为空才用占位
+    if not advisory:
         lines.append(
             "（无：致命风险已拦截交易建议生成，或当前风险级别未给出可执行建议。）"
         )

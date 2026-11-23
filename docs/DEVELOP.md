@@ -48,8 +48,8 @@ uv run pytest tests/test_audit.py -v
   `uv python install 3.11` → `uv sync` → `uv run pytest`。
 - 后端与 mock：单元测试用 `monkeypatch` 替换 `litellm.completion` 注入确定性响应，
   走真实 LiteLLM 后端路径，无需密钥；`tests/conftest.py` 会清除外部注入的
-  `QUANTSENTINEL_LLM_MOCK`，保证本地与 CI 一致。示例测试由 `tests/test_examples.py`
-  在子进程内自设 `QUANTSENTINEL_LLM_MOCK=1`。因此工作流**不注入全局 mock**——
+  `QUANT_ASST_LLM_MOCK`，保证本地与 CI 一致。示例测试由 `tests/test_examples.py`
+  在子进程内自设 `QUANT_ASST_LLM_MOCK=1`。因此工作流**不注入全局 mock**——
   注入会切换到 `MockCompletionBackend`，使依赖 `litellm.completion` 注入的单元测试
   收不到响应而失败；工作流仅设置 `LITELLM_OFFLINE_MODE=true` 避免 litellm 导入期网络请求。
 - 测试报告：`pytest --junitxml=pytest.xml`，并上传为 `pytest-report` artifact。
@@ -103,7 +103,7 @@ uv run pytest tests/test_audit.py -v
 - **头部注释四字段**：用途、适用场景、是否需要 API Key、是否依赖本地 parquet 缓存。
 - **复用公共底座**：`import _common`，调用 `run_backtest` / `run_debate` /
   `run_audit` / `build_html` / `run_full_pipeline`，不要复制流程逻辑。
-- **默认 mock**：`_common.py` 已在导入前设置 `QUANTSENTINEL_LLM_MOCK` 兜底，无需重复设置。
+- **默认 mock**：`_common.py` 已在导入前设置 `QUANT_ASST_LLM_MOCK` 兜底，无需重复设置。
 - **路径兼容**：不在脚本内硬编码绝对路径或 `chdir`；统一由 `_common.ensure_project_root()`
   保证工作目录为项目根，路径全部经 `pathlib` 处理（Windows / POSIX 分隔符通用）。
 - **可清理**：产物落入 `output/`；可用 `examples/clean_examples_output.py` 一键清理。
@@ -144,10 +144,35 @@ Get-ChildItem cli.py            # 应能看到 cli.py
 - 若其他模块先于 `core.llm` 导入 litellm，导入期告警无法追溯消除（已用常量置 0 兜底）。
 - 真实模式下该告警属正常行为，不影响功能。
 
-### 本地沙箱警告
+### 未来函数确定性检查
+
+`backtest/lookahead.py` 提供截断历史一致性审计：把数据截断到前 k 行重跑同一策略，
+若截断窗口内的信号与全量运行不一致，说明策略引用了当时不可见的未来数据。
+
+```bash
+uv run python cli.py backtest cn:600519 --lookahead-check   # 检查不通过即中止回测（退出码 2）
+```
+
+默认关闭（成本考量：每个检查点多跑一次策略）。测试基建见 `tests/test_lookahead.py`：
+对 `examples/dual_ma.py` 断言通过，对 ``shift(-n)`` / 全局统计量泄漏 / 反序引用
+构造的作弊 fixture 断言必被抓到。
+
+### 本地沙箱警告与密钥隔离
 
 `--sandbox local` 会在 CLI、日志与执行结果中强制展示红色警告，这是预期行为，
 提示该模式仅用于开发调试，禁止生产使用。Release 请使用 `--sandbox docker`。
+
+⚠️ local 沙箱的定位是**缓释措施而非硬安全边界**：AST 静态安检可被动态导入、
+编码混淆绕过，进程与文件系统也没有真正隔离。执行不可信策略代码必须使用 Docker 沙箱。
+
+已实现的隔离加固（外部代码 review 第 3 项）：
+
+- **环境变量白名单透传**：子进程只接收 `PATH` / `HOME` / `PYTHONPATH` 等运行必需项；
+  名称含 `KEY` / `TOKEN` / `SECRET` / `PRIVATE` 的宿主密钥一律剔除，
+  包括显式注入的疑似密钥变量。
+- **Docker 最小挂载**：容器只读挂载 `backtest/` 与 `core/markets.py`，
+  不再整根挂载项目目录；挂载列表层面显式排除 `.env` 及 `.env.*`；
+  容器不接收宿主环境变量。
 
 ## 6. 提交前检查清单
 

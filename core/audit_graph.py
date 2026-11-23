@@ -23,8 +23,8 @@ from langgraph.graph import END, START, StateGraph
 from agents.final_risk_officer import FinalRiskOfficerAgent
 from agents.redteam import RedTeamAgent
 from core.config import Settings
-from core.risk_gate import apply_risk_gate, final_decision
-from core.schemas import FinalAnalysisReport
+from core.risk_gate import advisory_for_decision, apply_risk_gate, final_decision
+from core.schemas import FinalAnalysisReport, normalize_risk_level
 from core.state import QuantSentinelState
 from core.trajectory import TrajectoryRecorder
 
@@ -64,7 +64,7 @@ def build_audit_graph(
         # 用真实 run_id 覆盖 LLM 输出中的占位标识，保证可追溯
         report["audit_run_id"] = run_id
         report["source_run_id"] = source_run_id or report.get("source_run_id", "")
-        level = report.get("overall_risk_level", "low")
+        level = normalize_risk_level(report.get("overall_risk_level"))
         recorder.log(node="redteam", event="output",
                      payload={"overall_risk_level": level,
                               "n_findings": len(report.get("findings", []))})
@@ -94,10 +94,12 @@ def build_audit_graph(
         gate = state.get("risk_gate") or {}
         outcome = state.get("debate_outcome") or {}
 
-        # 致命风险强制清空交易建议（门控拦截，不依赖 LLM 自觉）
-        trade_advisory = "" if not gate.get("trade_suggestion_allowed", True) else draft.get("trade_advisory", "")
         decision = final_decision(state.get("redteam_report") or {},
                                   (outcome.get("verdict") or {}))
+        # blocked 一致性：凡 final_decision == blocked（无论 critical 还是
+        # tradability=prohibited），trade_advisory 必须清空并写入拦截说明文案，
+        # 不能出现「决策已拦截、建议文本仍在输出」的不一致。
+        trade_advisory = advisory_for_decision(decision, draft.get("trade_advisory", ""))
 
         final = FinalAnalysisReport(
             symbol=draft.get("symbol") or state.get("symbol") or "",
@@ -107,7 +109,9 @@ def build_audit_graph(
             audit_run_id=run_id,
             final_decision=decision,
             credibility_score=draft.get("credibility_score", 0),
-            overall_risk_level=gate.get("risk_level") or draft.get("overall_risk_level", "low"),
+            overall_risk_level=normalize_risk_level(
+                gate.get("risk_level") or draft.get("overall_risk_level")
+            ),
             risk_gate=gate,
             executive_summary=draft.get("executive_summary", ""),
             key_findings=list(draft.get("key_findings") or []),

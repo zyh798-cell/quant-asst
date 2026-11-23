@@ -258,7 +258,7 @@ def test_resolve_period_fallback_recent_year():
 
 def test_build_html_report_degrades_on_backtest_failure(monkeypatch, test_settings, tmp_path):
     """参考回测取数失败时，build_html_report 降级为纯文本 HTML 且仍落盘。"""
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "1")
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
     from report import build as build_mod
 
     monkeypatch.setattr(

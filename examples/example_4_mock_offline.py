@@ -51,7 +51,7 @@ def main() -> int:
     print(f"标的       : {SYMBOL}")
     print(f"策略描述   : {HYPOTHESIS}")
     print(f"门控阈值   : {THRESHOLD}")
-    print("模式       : mock 离线（QUANTSENTINEL_LLM_MOCK=1）")
+    print("模式       : mock 离线（QUANT_ASST_LLM_MOCK=1）")
     print("密钥要求   : 无（不读取、不校验 DEEPSEEK_API_KEY）")
 
     settings = _common.settings()

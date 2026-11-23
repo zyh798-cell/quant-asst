@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     train_test_split: float = 0.7    # 样本内/外切分（样本外 30%，硬约束 5）
 
     # ---- Docker 沙箱（硬约束 3）----
-    sandbox_image: str = "quantsentinel-sandbox:latest"
+    sandbox_image: str = "quant-asst-sandbox:latest"
     sandbox_timeout_seconds: int = 120
     sandbox_memory_limit: str = "1g"
     sandbox_network_disabled: bool = True  # 沙箱容器禁网

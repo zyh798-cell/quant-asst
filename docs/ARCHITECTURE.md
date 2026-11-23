@@ -92,10 +92,17 @@
 ## 5. 设计约束
 
 1. **沙箱边界**：`--sandbox local`（`LocalRestrictedSandbox`）仅用于开发调试，
-   安全隔离不足（子进程 + AST 静态安检 + 资源限额的弱隔离），禁止生产使用。
-   Release 默认 `DockerSandbox`（容器级隔离）。local 模式会在 CLI、日志与执行结果中
-   强制展示红色警告。
-2. **mock 与真实模式切换**：环境变量 `QUANTSENTINEL_LLM_MOCK` 控制。真值
+   安全隔离不足（子进程 + AST 静态安检 + 资源限额 + 环境变量白名单的弱隔离），
+   **属于缓释措施而非硬安全边界**——静态安检可被动态导入、编码混淆绕过，
+   进程与文件系统均未真正隔离；执行不可信策略代码必须使用 Docker 沙箱。
+   禁止生产使用，Release 默认 `DockerSandbox`（容器级隔离）。
+   local 模式会在 CLI、日志与执行结果中强制展示红色警告。
+   - **Docker 最小挂载**：容器只读挂载回测执行必需的 `backtest/` 与
+     `core/markets.py`，不再整根挂载项目目录，并在挂载列表层面显式排除 `.env`
+     及任何 `.env.*`；容器不接收宿主环境变量（仅白名单运行必需项）。
+   - **local 密钥隔离**：子进程环境变量按白名单透传，名称含
+     `KEY` / `TOKEN` / `SECRET` / `PRIVATE` 的宿主密钥一律剔除。
+2. **mock 与真实模式切换**：环境变量 `QUANT_ASST_LLM_MOCK` 控制。真值
    （`1` / `true` / `yes` / `on`）启用 mock 离线后端，跳过真实 LLM、读本地预生成样例；
    假值（`0` / `false` / `no` / `off`）走真实 LiteLLM API。mock 模式同时设置
    `LITELLM_OFFLINE_MODE=true`，禁止 LiteLLM 后台拉取远端 cost 映射。

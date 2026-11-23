@@ -1,6 +1,6 @@
 """多空辩论模块测试：mock 离线后端、全链路、错误短路、报告渲染。
 
-全部使用 ``QUANTSENTINEL_LLM_MOCK=1``，不发起任何网络请求。
+全部使用 ``QUANT_ASST_LLM_MOCK=1``，不发起任何网络请求。
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _mock_mode(monkeypatch) -> None:
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "1")
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
 
 
 @pytest.fixture()
