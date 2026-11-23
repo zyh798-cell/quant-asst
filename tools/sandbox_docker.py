@@ -32,6 +32,36 @@ _ALLOWED_ENV_KEYS: frozenset[str] = frozenset({
     "PYTHONPATH", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "HOME", "TMPDIR",
 })
 
+#: 镜像名兼容别名：品牌改名前的旧镜像名仍可启动（避免本地已构建镜像失效）。
+_IMAGE_ALIASES: tuple[str, ...] = (
+    "quant-asst-sandbox:latest",
+    "quantsentinel-sandbox:latest",
+)
+
+
+def resolve_image_name(settings: Settings) -> str:
+    """解析可用的沙箱镜像名：优先配置值，其次按别名表探测本地已有镜像。
+
+    品牌改名（quant-ast -> quant-asst）后，本机可能仍只有旧名镜像；
+    此处做向后兼容探测，避免既有镜像无法使用。
+    """
+    configured = settings.sandbox_image
+    try:
+        import docker
+
+        client = docker.from_env(timeout=5)
+        if client.images.list(name=configured):
+            return configured
+        for alias in _IMAGE_ALIASES:
+            if alias != configured and client.images.list(name=alias):
+                logger.warning(
+                    "配置的沙箱镜像 %s 不存在，回退到本地已有镜像 %s", configured, alias
+                )
+                return alias
+    except Exception as exc:  # noqa: BLE001 —— 探测失败不阻断启动
+        logger.debug("镜像别名探测跳过：%s", exc)
+    return configured
+
 
 def filter_host_env(env: dict[str, str] | None = None) -> dict[str, str]:
     """按白名单过滤宿主环境变量（剔除一切密钥类与未知变量）。
@@ -131,7 +161,7 @@ class DockerSandbox(SandboxExecutor):
             env = filter_host_env()
             env["PYTHONPATH"] = f"{_CONTAINER_BACKTEST}:{_CONTAINER_CORE}"
             container = client.containers.run(
-                image=self.settings.sandbox_image,
+                image=resolve_image_name(self.settings),
                 command=["python", "-B", entrypoint],
                 detach=True,
                 working_dir=_CONTAINER_WORKDIR,

@@ -14,6 +14,60 @@ from tools.backtest_sandbox import SandboxExecutionError
 from tools.sandbox_docker import build_container_volumes, filter_host_env
 
 
+class _FakeImage:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _FakeImageList:
+    def __init__(self, names: list[str]) -> None:
+        self._names = names
+
+    def list(self, name: str):
+        return [_FakeImage(n) for n in self._names if n == name]
+
+
+class _FakeDockerClient:
+    def __init__(self, images: list[str]) -> None:
+        self.images = _FakeImageList(images)
+
+
+def test_resolve_image_name_prefers_configured(monkeypatch):
+    """配置值存在时按配置使用。"""
+    from core.config import Settings
+    from tools.sandbox_docker import resolve_image_name
+
+    settings = Settings(_env_file=None, var_dir=Path("var"))
+    monkeypatch.setattr(
+        "docker.from_env",
+        lambda timeout=5: _FakeDockerClient([settings.sandbox_image]),
+    )
+    assert resolve_image_name(settings) == settings.sandbox_image
+
+
+def test_resolve_image_name_falls_back_to_alias(monkeypatch):
+    """配置镜像缺失时回退到旧名镜像（品牌改名兼容）。"""
+    from core.config import Settings
+    from tools.sandbox_docker import resolve_image_name
+
+    settings = Settings(_env_file=None, var_dir=Path("var"))
+    monkeypatch.setattr(
+        "docker.from_env",
+        lambda timeout=5: _FakeDockerClient(["quantsentinel-sandbox:latest"]),
+    )
+    assert resolve_image_name(settings) == "quantsentinel-sandbox:latest"
+
+
+def test_resolve_image_name_keeps_configured_when_nothing_found(monkeypatch):
+    """本地无任何可用镜像时仍返回配置值（由后续 healthcheck 明确报错）。"""
+    from core.config import Settings
+    from tools.sandbox_docker import resolve_image_name
+
+    settings = Settings(_env_file=None, var_dir=Path("var"))
+    monkeypatch.setattr("docker.from_env", lambda timeout=5: _FakeDockerClient([]))
+    assert resolve_image_name(settings) == settings.sandbox_image
+
+
 def _make_project(tmp_path: Path) -> Path:
     """构造最小项目树：backtest/ + core/markets.py。"""
     root = tmp_path / "proj"
