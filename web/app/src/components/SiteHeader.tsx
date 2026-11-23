@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { ExternalLink, Menu, X } from 'lucide-react'
 
 import logo from '@/assets/brand/logo-color.svg'
 import { Button } from '@/components/ui/button'
@@ -71,6 +71,14 @@ export function SiteHeader() {
             ))}
           </ul>
           <div className="site-nav__actions">
+            <a
+              className="site-nav__repo"
+              href="https://zyh798-cell.github.io/quant-asst/"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="size-4" aria-hidden />
+              <span>在线演示</span>
+            </a>
             <a
               className="site-nav__repo"
               href="https://github.com/zyh798-cell/quant-asst"

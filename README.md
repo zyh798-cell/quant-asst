@@ -15,11 +15,16 @@
   <a href="https://github.com/zyh798-cell/quant-asst">
     <img src="https://img.shields.io/badge/zyh798--cell%2Fquant--ast-3776ab" alt="zyh798-cell/quant-asst">
   </a>
+  <a href="https://zyh798-cell.github.io/quant-asst/">
+    <img src="https://img.shields.io/badge/在线演示-Live-18A67C" alt="在线演示">
+  </a>
 </p>
 
 </div>
 
 Quant Asst 是一个基于多 Agent 协作的量化策略研究与风控审计框架。它把自然语言策略假设解析为可执行代码，在本地沙箱内完成事件驱动回测，再经多空辩论、红队对抗审计与确定性风控分级，最终输出可归档的 Markdown 与可交互的 HTML 报告。项目仅用于研究与技术演示，不构成任何投资建议，不含实盘下单功能。
+
+**在线演示**：<https://zyh798-cell.github.io/quant-asst/>（GitHub Pages 部署静态前端，工作台默认 mock 离线模式可完整演示；真实模式需本地启动 `server/`）。
 
 ## 核心能力
 
@@ -140,6 +145,16 @@ npm run build      # 产物在 web/app/dist/
 npm run preview
 ```
 
+### GitHub Pages 在线演示
+
+线上地址：<https://zyh798-cell.github.io/quant-asst/>
+
+- 部署由 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) 完成：push `main` 后在 CI 中 `npm ci && npm run build`（`VITE_BASE=/quant-asst/`，适配子路径），上传 `web/app/dist` 为 artifact 并 `deploy-pages`。
+- **只部署静态前端**：`server/` 与 `.env` 不参与构建，无密钥泄漏面。
+- 一次性配置：仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
+- 站点工作台默认 mock 离线模式，可完整演示；真实模式需在本地启动 `server/`（页面已给出提示）。
+- 想看**真实模式跑出来的完整长窗口报告**：见 [`docs/demo/`](docs/demo/)（cn:600519，2025-01-05 ~ 2026-11-20，含辩论 / 审计 / 最终报告与交互式 HTML）。
+
 ### Step B：双端联调（接口层 + 工具站）
 
 接口层位于 [`server/`](server/)，是**薄编排层**：只做 HTTP 契约、任务状态机与产物 DTO 转换，策略逻辑全部复用 `core` / `agents` / `tools` / `backtest` / `report` / `audit`，不新写策略代码，也不接触密钥。
@@ -185,6 +200,7 @@ npm run dev        # http://localhost:5173
 - [`docs/DEVELOP.md`](docs/DEVELOP.md)：项目初始化、新增 Agent / 示例规范、测试约定与排查。
 - [`docs/BRAND.md`](docs/BRAND.md)：品牌名称、Logo 资产、色彩与使用约定。
 - [`docs/design/README.md`](docs/design/README.md)：前端设计规范入口（设计令牌、禁用清单、金融数据产品准则）。
+- [`docs/demo/README.md`](docs/demo/README.md)：长窗口真实模式演示产物（cn:600519，2025-01-05 ~ 2026-11-20）——辩论纪要、红队审计、最终报告与交互式 HTML，含可信度与风控结论。
 - [`examples/README.md`](examples/README.md)：示例脚本一览、推荐运行顺序与产物说明。
 
 ## 风险声明

@@ -36,16 +36,38 @@ const INITIAL_STAGES: Stage[] = STAGE_DEFS.map((d) => ({
   summary: '',
 }))
 
-const DEFAULT_CONFIG: RunConfig = {
-  strategy: '双均线策略，5 日线上穿 20 日线买入，死叉卖出',
-  symbol: 'cn:600519',
-  market: 'cn_stock',
-  periodStart: '2024-01-01',
-  periodEnd: '2024-12-31',
-  // 与后端默认一致：A 股一手 100 股，茅台约 15 万元/手，10 万资金会因买不起一手而零成交
-  initialCapital: 1_000_000,
-  mock: true,
+/**
+ * 浏览器本地时区的 YYYY-MM-DD（与 <input type="date"> 一致）。
+ * 不用 toISOString()：那是 UTC，东八区 08:00 前会取到前一天。
+ */
+function localDateISO(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
+
+/** 默认回测窗口：结束日 = 当天，开始日 = 7 天前（浏览器本地时区）。 */
+function defaultDates(): { periodStart: string; periodEnd: string } {
+  const end = new Date()
+  const start = new Date(end)
+  start.setDate(end.getDate() - 7)
+  return { periodStart: localDateISO(start), periodEnd: localDateISO(end) }
+}
+
+function makeDefaultConfig(): RunConfig {
+  return {
+    strategy: '双均线策略，5 日线上穿 20 日线买入，死叉卖出',
+    symbol: 'cn:600519',
+    market: 'cn_stock',
+    ...defaultDates(),
+    // 与后端默认一致：A 股一手 100 股，茅台约 15 万元/手，10 万资金会因买不起一手而零成交
+    initialCapital: 1_000_000,
+    mock: true,
+  }
+}
+
+const DEFAULT_CONFIG: RunConfig = makeDefaultConfig()
 
 type Phase = 'idle' | 'running' | 'done' | 'failed'
 type Backend = 'local' | 'remote'
@@ -258,7 +280,8 @@ export const useStudioStore = create<StudioState>()((set, get) => {
 
     reset: () => {
       runToken += 1
-      set({ phase: 'idle', backend: 'local' })
+      // 恢复默认配置（含按当天重算的默认日期窗口），再清空结果
+      set({ phase: 'idle', backend: 'local', config: makeDefaultConfig() })
       resetResults()
     },
   }

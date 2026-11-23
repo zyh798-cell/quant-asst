@@ -7,6 +7,10 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
 import { HomePage } from '@/pages/HomePage'
 
+// Vite base（'/' 或 '/quant-asst/'）必须同步给路由，否则子路径部署时
+// /studio 会因 location.pathname 含前缀而匹配不到，落到 '*' -> 首页。
+const basename = import.meta.env.BASE_URL || '/'
+
 // 工具站含 Recharts 等较重依赖，按需分包，避免拖慢首页 LCP
 const StudioPage = lazy(() => import('@/pages/StudioPage').then((m) => ({ default: m.StudioPage })))
 
@@ -19,7 +23,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <a className="skip-link" href="#main">
           跳到主内容
         </a>

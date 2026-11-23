@@ -201,6 +201,13 @@ export function StudioPage() {
                     <span className="switch__thumb" data-checked={config.mock} />
                   </button>
                 </div>
+                {!config.mock && (
+                  <p className="form-field__hint" role="note">
+                    真实模式需本地启动后端（<code>server/</code>：
+                    <code>uv run uvicorn server.main:app --port 8000</code>），详见 README。
+                    未启动后端时运行会进入失败态。
+                  </p>
+                )}
 
                 <div className="flex gap-2">
                   <Button type="button" onClick={() => void run()} disabled={running} className="flex-1">
