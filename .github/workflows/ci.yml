@@ -45,3 +45,42 @@ jobs:
           name: pytest-report
           path: pytest.xml
           if-no-files-found: ignore
+
+      # 将失败用例名与断言摘要写成 check annotation，便于在 Run 页面直接定位
+      # （job 日志需 admin 权限下载，annotation 对只读访问可见）。
+      - name: Surface test failures
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          path = "pytest.xml"
+          if not os.path.exists(path):
+              print("::error::pytest.xml 不存在：测试进程可能未能启动或收集阶段崩溃")
+              raise SystemExit(0)
+
+          root = ET.parse(path).getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          if suite is not None:
+              print(
+                  "::warning::pytest 汇总：tests={} failures={} errors={} skipped={}".format(
+                      suite.get("tests"), suite.get("failures"),
+                      suite.get("errors"), suite.get("skipped"),
+                  )
+              )
+
+          found = 0
+          for case in root.iter("testcase"):
+              for node in list(case):
+                  if node.tag not in ("failure", "error"):
+                      continue
+                  found += 1
+                  title = "{}::{}".format(case.get("classname"), case.get("name"))
+                  message = ((node.get("message") or "") + "\n" + (node.text or "")).strip()
+                  message = message.replace("\r", " ").replace("\n", " ")
+                  print("::error title={}::{}".format(title, message[:900]))
+
+          if found == 0:
+              print("::warning::pytest.xml 中未解析到失败用例（可能为收集期错误，见上方汇总）")
+          PY
