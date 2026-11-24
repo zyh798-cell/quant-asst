@@ -123,13 +123,77 @@ def test_minimum_akshare_version_is_declared() -> None:
 
 
 def test_interface_name_matches_akshare_contract() -> None:
-    """用真实 akshare 的 interface_info 核对签名与输出列（不拉数据，仅读元信息）。"""
+    """用真实 akshare 的 interface_info 核对解析出的接口签名与输出列。
+
+    背景（CI 修复）：akshare 1.20.64 起 ``stock_us_daily_sina`` 再次更名为
+    ``stock_us_hist_sina``，CI 全新安装装到 1.20.65 而本地锁 1.20.63，
+    导致原先硬编码接口名的用例只在 CI 失败。现改为校验**解析结果**而非固定名。
+    """
     ak = pytest.importorskip("akshare")
-    info = ak.interface_info("stock_us_daily_sina")
+    from data.adapters.us_stock import INTERFACE_CANDIDATES, resolve_us_interface
+
+    resolved = resolve_us_interface(ak)
+    assert resolved in INTERFACE_CANDIDATES
+
+    info = ak.interface_info(resolved)
     params = {p["name"] for p in info["params"]}
     outputs = {o["name"] for o in info["outputs"]}
+    # 适配器调用时固定传 symbol / adjust，二者必须存在于签名中
     assert {"symbol", "adjust"} <= params
     # 代码按这些列名取值，缺一不可
     assert {"date", "open", "high", "low", "close", "volume"} <= outputs
-    # 确认适配器不会误用已废弃的旧名
-    assert not hasattr(ak, "stock_us_daily") or hasattr(ak, "stock_us_daily_sina")
+
+
+@pytest.mark.parametrize("usable,expected", [
+    # (当前版本真实可用的接口名集合, 期望解析结果)
+    ({"stock_us_daily"}, "stock_us_daily"),
+    ({"stock_us_hist_sina"}, "stock_us_hist_sina"),
+    ({"stock_us_daily_sina"}, "stock_us_daily_sina"),
+    # 新旧同时可用时优先新名
+    ({"stock_us_hist_sina", "stock_us_daily_sina"}, "stock_us_hist_sina"),
+])
+def test_resolve_prefers_newest_available(usable, expected) -> None:
+    """新名优先、逐级回退；interface_info 拒绝的名字不算可用。"""
+    from data.adapters.us_stock import INTERFACE_CANDIDATES, resolve_us_interface
+
+    mod = types.ModuleType("akshare_fake")
+    for name in usable:
+        setattr(mod, name, lambda **kw: None)
+
+    def interface_info(name: str) -> dict:
+        if name not in usable:
+            raise RuntimeError(f"{name} 不存在")
+        return {"name": name}
+
+    mod.interface_info = interface_info
+    assert resolve_us_interface(mod) == expected
+    assert expected in INTERFACE_CANDIDATES
+
+
+def test_resolve_raises_when_no_candidate_usable(monkeypatch) -> None:
+    """所有候选均不可用时明确报错（fail-closed，不静默取错数据）。"""
+    import pytest as _pytest
+
+    from data.adapters.us_stock import resolve_us_interface
+
+    mod = types.ModuleType("akshare_fake")
+    with _pytest.raises(RuntimeError, match="未找到可用的美股日线接口"):
+        resolve_us_interface(mod)
+
+
+def test_fetch_daily_rejects_unexpected_columns(monkeypatch) -> None:
+    """接口返回列与预期不符时直接报错，不做静默错位归一。"""
+    from data.adapters.us_stock import UsStockAdapter
+
+    captured: dict[str, Any] = {}
+    mod = _fake_akshare(captured, SAMPLE_COLS_PLAIN)
+    # 抹掉 close 列，模拟接口形态变更
+    mod.stock_us_daily_sina = lambda symbol, adjust="": pd.DataFrame({
+        "date": pd.bdate_range("2024-01-01", "2024-01-05"),
+        "open": [1.0] * 5, "high": [1.0] * 5, "low": [1.0] * 5,
+        "volume": [1.0] * 5,
+    })
+    monkeypatch.setitem(sys.modules, "akshare", mod)
+
+    with pytest.raises(ValueError, match="返回列缺失"):
+        UsStockAdapter().fetch_daily(Symbol.parse("us:AAPL"), "2024-01-01", "2024-01-31")
