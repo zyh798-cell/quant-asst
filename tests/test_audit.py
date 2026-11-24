@@ -220,6 +220,12 @@ def _sample_debate_outcome() -> dict:
 
 
 def test_audit_graph_end_to_end_mock(monkeypatch, test_settings):
+    # 必须显式启用 mock：否则红队节点会走真实 litellm，无密钥环境（CI）直接认证失败。
+    # （回归：批量改名时此行曾丢失，本机因 uv run 自动加载 .env 的真实密钥而“假绿”）
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
+    # 再显式清空宿主密钥，保证本用例不依赖 .env / shell 环境（与 CI 条件一致）
+    for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
     graph, recorder = build_audit_graph(test_settings, run_id="audit-test",
                                         source_run_id="debate-src")
     try:
