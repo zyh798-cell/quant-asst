@@ -22,6 +22,8 @@
 
 </div>
 
+**中文** | [English](README.en.md)
+
 Quant Asst 是一个基于多 Agent 协作的量化策略研究与风控审计框架。它把自然语言策略假设解析为可执行代码，在本地沙箱内完成事件驱动回测，再经多空辩论、红队对抗审计与确定性风控分级，最终输出可归档的 Markdown 与可交互的 HTML 报告。项目仅用于研究与技术演示，不构成任何投资建议，不含实盘下单功能。
 
 **在线演示**：<https://zyh798-cell.github.io/quant-asst/>（GitHub Pages 部署静态前端，工作台默认 mock 离线模式可完整演示；真实模式需本地启动 `server/`）。
