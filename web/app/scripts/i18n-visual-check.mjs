@@ -4,7 +4,9 @@ import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium } from 'playwright-core'
 
-const BASE = process.env.CHECK_BASE ?? 'http://localhost:4173/'
+// BASE 必须以斜杠结尾：项目部署在 /quant-asst/ 子路径下，不能用 new URL('/studio', BASE)
+// （那会解析成站点根，丢掉子路径）。
+const BASE = (process.env.CHECK_BASE ?? 'http://localhost:4173/').replace(/\/?$/, '/')
 const OUT = resolve(import.meta.dirname, '../.test-dist/screenshots')
 
 const VIEWPORTS = [
@@ -66,7 +68,7 @@ async function main() {
     const page = await context.newPage()
 
     // ---- 首页 ----
-    await page.goto(new URL('/', BASE).href, { waitUntil: 'networkidle' })
+    await page.goto(`${BASE}`, { waitUntil: 'networkidle' })
     try {
       await assertLang(page, ZH_MARKERS, `${vp.name} 首页默认中文`)
       await page.screenshot({ path: `${OUT}/${vp.name}-home-zh.png`, fullPage: false })
@@ -85,8 +87,13 @@ async function main() {
 
     // ---- 工作台 ----
     try {
-      await page.goto(new URL('/studio', BASE).href, { waitUntil: 'networkidle' })
-      await page.waitForTimeout(400)
+      // GitHub Pages 无 SPA fallback，/studio 直链会 404；改走真实用户路径：首页点「打开工作台」。
+      await page.goto(`${BASE}`, { waitUntil: 'networkidle' })
+      const openLabel = (await page.locator('body').innerText()).includes('打开工作台')
+        ? /打开工作台/
+        : /Open studio/
+      await page.getByRole('link', { name: openLabel }).first().click()
+      await page.waitForTimeout(900)
       await assertLang(page, STUDIO_EN, `${vp.name} studio 沿用英文`)
       await page.screenshot({ path: `${OUT}/${vp.name}-studio-en.png`, fullPage: false })
 
