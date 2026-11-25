@@ -17,23 +17,26 @@ import type {
   RunConfig,
   Stage,
   StageId,
+  SummaryKey,
 } from '@/types'
 import type { AnalysisStatusResponse, StageStatus } from '@/types/api'
 
-const STAGE_DEFS: ReadonlyArray<{ id: StageId; label: string; duration: number }> = [
-  { id: 'parse', label: '解析', duration: 520 },
-  { id: 'backtest', label: '回测', duration: 820 },
-  { id: 'debate', label: '辩论', duration: 900 },
-  { id: 'audit', label: '审计', duration: 720 },
-  { id: 'risk', label: '风控', duration: 420 },
-  { id: 'report', label: '报告', duration: 520 },
+/**
+ * 阶段定义只保留标识与时长；标签与摘要文案由语言字典在渲染层提供，
+ * 这样切换语言时无需重建 store 状态。
+ */
+const STAGE_DEFS: ReadonlyArray<{ id: StageId; duration: number }> = [
+  { id: 'parse', duration: 520 },
+  { id: 'backtest', duration: 820 },
+  { id: 'debate', duration: 900 },
+  { id: 'audit', duration: 720 },
+  { id: 'risk', duration: 420 },
+  { id: 'report', duration: 520 },
 ]
 
 const INITIAL_STAGES: Stage[] = STAGE_DEFS.map((d) => ({
   id: d.id,
-  label: d.label,
   status: 'pending',
-  summary: '',
 }))
 
 /**
@@ -202,7 +205,7 @@ export const useStudioStore = create<StudioState>()((set, get) => {
       applySnapshot(body)
 
       if (body.status === 'failed') {
-        throw new Error(body.error || '任务失败')
+        throw new Error(body.error || 'task failed')
       }
       if (body.status === 'completed') break
     }
@@ -256,11 +259,11 @@ export const useStudioStore = create<StudioState>()((set, get) => {
 
         for (const def of STAGE_DEFS) {
           if (!alive()) return
-          patchStage(def.id, { status: 'running', summary: '' })
-          await sleep(def.duration)
-          if (!alive()) return
-          const summary = summaryFor(def.id, result, debate, audit)
-          patchStage(def.id, { status: 'done', summary })
+        patchStage(def.id, { status: 'running', summary: '' })
+        await sleep(def.duration)
+        if (!alive()) return
+        const summary = summaryFor(def.id, result, debate, audit)
+        patchStage(def.id, { status: 'done', ...summary })
         }
 
         set({
@@ -273,7 +276,7 @@ export const useStudioStore = create<StudioState>()((set, get) => {
         })
       } catch (err) {
         if (!alive()) return
-        const message = err instanceof Error ? err.message : '任务执行失败'
+        const message = err instanceof Error ? err.message : 'task execution failed'
         set({ phase: 'failed', error: message })
       }
     },
@@ -287,32 +290,41 @@ export const useStudioStore = create<StudioState>()((set, get) => {
   }
 })
 
+/**
+ * 阶段摘要的结构化描述：渲染层按当前语言字典插值，避免 store 依赖语言状态。
+ */
 function summaryFor(
   id: StageId,
   result: BacktestResult | null,
   debate: DebateBrief | null,
   audit: AuditBrief | null,
-): string {
+): { summaryKey?: SummaryKey; summaryVars?: Record<string, string | number> } {
   switch (id) {
     case 'parse':
-      return '已解析策略规格：标的、区间、开平仓规则与参数'
+      return { summaryKey: 'parse' }
     case 'backtest':
       return result
-        ? `回测完成：${result.metrics.n_trades} 笔成交，${result.metrics.n_days} 个交易日`
-        : '回测完成'
+        ? { summaryKey: 'backtest', summaryVars: { n: result.metrics.n_trades, d: result.metrics.n_days } }
+        : { summaryKey: 'backtestFallback' }
     case 'debate':
       return debate
-        ? `裁决：${debate.decision}，可信度 ${debate.credibility_score}/100`
-        : '辩论完成'
+        ? {
+            summaryKey: 'debate',
+            summaryVars: { decision: debate.decision, score: debate.credibility_score },
+          }
+        : { summaryKey: 'debateFallback' }
     case 'audit':
       return audit
-        ? `综合风险：${audit.risk_grade_label}，${audit.findings.length} 条发现`
-        : '审计完成'
+        ? {
+            summaryKey: 'audit',
+            summaryVars: { risk: audit.risk_grade_label, n: audit.findings.length },
+          }
+        : { summaryKey: 'auditFallback' }
     case 'risk':
-      return audit ? '决策映射完成，约束边界已写入报告' : '风控完成'
+      return { summaryKey: audit ? 'risk' : 'riskFallback' }
     case 'report':
-      return '已生成 Markdown 报告（HTML 报告见真实模式）'
+      return { summaryKey: 'report' }
     default:
-      return ''
+      return {}
   }
 }

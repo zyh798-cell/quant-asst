@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { SiteFooter } from '@/components/SiteFooter'
 import { SiteHeader } from '@/components/SiteHeader'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
+import { I18nContext, useI18nProvider } from '@/i18n'
 import { HomePage } from '@/pages/HomePage'
 
 // Vite base（'/' 或 '/quant-asst/'）必须同步给路由，否则子路径部署时
@@ -20,30 +21,33 @@ const queryClient = new QueryClient({
 
 export default function App() {
   useSmoothScroll()
+  const i18n = useI18nProvider()
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={basename}>
-        <a className="skip-link" href="#main">
-          跳到主内容
-        </a>
-        <SiteHeader />
-        <main id="main">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route
-              path="/studio"
-              element={
-                <Suspense fallback={<div className="shell studio" aria-busy="true" />}>
-                  <StudioPage />
-                </Suspense>
-              }
-            />
-            <Route path="*" element={<HomePage />} />
-          </Routes>
-        </main>
-        <SiteFooter />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <I18nContext.Provider value={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter basename={basename}>
+          <a className="skip-link" href="#main">
+            {i18n.t.skipToMain}
+          </a>
+          <SiteHeader />
+          <main id="main">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route
+                path="/studio"
+                element={
+                  <Suspense fallback={<div className="shell studio" aria-busy="true" />}>
+                    <StudioPage />
+                  </Suspense>
+                }
+              />
+              <Route path="*" element={<HomePage />} />
+            </Routes>
+          </main>
+          <SiteFooter />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </I18nContext.Provider>
   )
 }

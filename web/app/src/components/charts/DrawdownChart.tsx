@@ -8,6 +8,7 @@ import {
   YAxis,
 } from 'recharts'
 
+import { useT } from '@/i18n'
 import type { EquityPoint } from '@/types'
 
 interface DrawdownChartProps {
@@ -21,12 +22,13 @@ function DdTooltip({
   active?: boolean
   payload?: Array<{ payload: EquityPoint }>
 }) {
+  const t = useT()
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
     <div className="rounded-md border border-rule bg-surface px-3 py-2 text-caption shadow-md">
       <p className="text-muted">{p.date}</p>
-      <p className="num text-danger-ink">回撤 {(p.drawdown * 100).toFixed(2)}%</p>
+      <p className="num text-danger-ink">{t.chartDrawdown} {(p.drawdown * 100).toFixed(2)}%</p>
     </div>
   )
 }

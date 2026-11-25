@@ -3,7 +3,9 @@ import { Link, useLocation } from 'react-router-dom'
 import { ExternalLink, Menu, X } from 'lucide-react'
 
 import logo from '@/assets/brand/logo-color.svg'
+import { LangSwitch } from '@/components/LangSwitch'
 import { Button } from '@/components/ui/button'
+import { useT } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 /** GitHub 官方 octicon（mark-github, 16x16），避免依赖 lucide 已移除的品牌图标 */
@@ -15,17 +17,10 @@ function GithubMark({ className }: { className?: string }) {
   )
 }
 
-const NAV = [
-  { href: '/#capability', label: '能力' },
-  { href: '/#pipeline', label: '流水线' },
-  { href: '/#debate', label: '辩论' },
-  { href: '/#risk', label: '风控' },
-  { href: '/#report', label: '报告' },
-]
-
 export function SiteHeader() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const t = useT()
 
   useEffect(() => {
     setOpen(false)
@@ -40,13 +35,21 @@ export function SiteHeader() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
+  const NAV = [
+    { href: '/#capability', label: t.navCapability },
+    { href: '/#pipeline', label: t.navPipeline },
+    { href: '/#debate', label: t.navDebate },
+    { href: '/#risk', label: t.navRisk },
+    { href: '/#report', label: t.navReport },
+  ]
+
   return (
     <header className="site-header sticky top-0 z-sticky-nav border-b border-rule bg-bg/90 backdrop-blur">
       <div className="shell site-header__inner">
         <a className="brand" href="/">
           <img src={logo} alt="" width={32} height={32} />
           <span className="brand__name">Quant Asst</span>
-          <span className="brand__tag">LLM Quant Analysis Agent</span>
+          <span className="brand__tag">{t.brandTag}</span>
         </a>
 
         <button
@@ -57,10 +60,10 @@ export function SiteHeader() {
           onClick={() => setOpen((v) => !v)}
         >
           {open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
-          <span className="nav-toggle__label">{open ? '关闭' : '菜单'}</span>
+          <span className="nav-toggle__label">{open ? t.navClose : t.navMenu}</span>
         </button>
 
-        <nav id="site-nav" className={cn('site-nav', open && 'is-open')} aria-label="主导航">
+        <nav id="site-nav" className={cn('site-nav', open && 'is-open')} aria-label={t.navLabel}>
           <ul className="site-nav__list">
             {NAV.map((item) => (
               <li key={item.href}>
@@ -71,13 +74,14 @@ export function SiteHeader() {
             ))}
           </ul>
           <div className="site-nav__actions">
+            <LangSwitch />
             <a
               className="site-nav__repo"
               href="https://zyh798-cell.github.io/quant-asst/"
               rel="noopener noreferrer"
             >
               <ExternalLink className="size-4" aria-hidden />
-              <span>在线演示</span>
+              <span>{t.navDemo}</span>
             </a>
             <a
               className="site-nav__repo"
@@ -85,10 +89,10 @@ export function SiteHeader() {
               rel="noopener noreferrer"
             >
               <GithubMark className="size-4" />
-              <span>GitHub</span>
+              <span>{t.navRepo}</span>
             </a>
             <Button asChild size="sm">
-              <Link to="/studio">打开工作台</Link>
+              <Link to="/studio">{t.navOpenStudio}</Link>
             </Button>
           </div>
         </nav>

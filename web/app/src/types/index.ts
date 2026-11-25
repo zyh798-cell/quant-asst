@@ -80,12 +80,30 @@ import type { StageId, StageStatus } from '@/types/api'
 
 export type { StageId, StageStatus } from '@/types/api'
 
+/**
+ * 前端视图阶段的展示文案：store 保存结构化摘要，标签与插值在渲染层完成，
+ * 以便切换语言时不重建状态。
+ */
 export interface Stage {
   id: StageId
-  label: string
+  label?: string
   status: StageStatus
-  summary: string
+  summary?: string
+  summaryKey?: SummaryKey
+  summaryVars?: Record<string, string | number>
 }
+
+export type SummaryKey =
+  | 'parse'
+  | 'backtest'
+  | 'backtestFallback'
+  | 'debate'
+  | 'debateFallback'
+  | 'audit'
+  | 'auditFallback'
+  | 'risk'
+  | 'riskFallback'
+  | 'report'
 
 /** 风控综合结论（server 阶段 risk 的 final_report 子集） */
 export interface FinalBrief {

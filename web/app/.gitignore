@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 前端单测打包产物与自检截图（仅本地生成，不入库）
+.test-dist

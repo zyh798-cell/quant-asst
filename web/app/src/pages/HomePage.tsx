@@ -7,103 +7,59 @@ import { HeroScene } from '@/components/hero/HeroScene'
 import '@/hooks/useSmoothScroll'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useT } from '@/i18n'
+import type { Dict } from '@/i18n/dict'
 import './home.css'
 
-const CAPABILITIES = [
-  {
-    index: '01',
-    title: '自然语言策略解析',
-    text: '把一句策略描述转为结构化规格与可执行代码，字段级校验，解析失败保留原始假设与原因。',
-    wide: false,
-  },
-  {
-    index: '02',
-    title: '本地沙箱回测',
-    text: '事件驱动引擎在隔离沙箱内执行，输出年化、最大回撤、夏普、胜率等指标，并做样本内外切分。',
-    wide: false,
-  },
-  {
-    index: '03',
-    title: '多空辩论',
-    text: '多头、空头、风控核验、最终裁决多轮对抗，逐轮留痕，产出裁决与可回测的修订建议。',
-    wide: false,
-  },
-  {
-    index: '04',
-    title: '红队对抗审计',
-    text: '独立于辩论的审计角色，按逻辑漏洞、过拟合、未来函数、幸存者偏差等类别逐条排查并定级。',
-    wide: false,
-  },
-  {
-    index: '05',
-    title: '风控分级拦截',
-    text: '确定性门控规则，可复现：低、中、高、致命四级，致命风险恒为阻断。',
-    wide: false,
-  },
-  {
-    index: '06',
-    title: 'Markdown 与 HTML 双报告',
-    text: '同源生成归档版 Markdown 与单文件交互 HTML，含 K 线、买卖信号、净值与回撤。',
-    wide: true,
-  },
-]
+/** 能力卡片：文案取自语言字典，结构（index / wide）保持静态，避免 GSAP 选择器受影响。 */
+function capabilities(t: Dict) {
+  return [
+    { index: '01', title: t.cap01Title, text: t.cap01Text, wide: false },
+    { index: '02', title: t.cap02Title, text: t.cap02Text, wide: false },
+    { index: '03', title: t.cap03Title, text: t.cap03Text, wide: false },
+    { index: '04', title: t.cap04Title, text: t.cap04Text, wide: false },
+    { index: '05', title: t.cap05Title, text: t.cap05Text, wide: false },
+    { index: '06', title: t.cap06Title, text: t.cap06Text, wide: true },
+  ]
+}
 
-const PIPELINE = [
-  { index: '01', title: '解析', role: 'hypothesis agent', artifact: '策略规格与策略代码' },
-  { index: '02', title: '回测', role: 'backtest engine', artifact: '绩效指标与交易明细' },
-  { index: '03', title: '辩论', role: 'bull / bear / risk / judge', artifact: '逐轮辩论记录与裁决' },
-  { index: '04', title: '审计', role: 'red team / risk', artifact: '审计发现与风险等级' },
-  { index: '05', title: '风控', role: 'risk gate', artifact: '门控结论与约束边界' },
-  { index: '06', title: '报告', role: 'reviewer', artifact: 'Markdown 与 HTML 报告' },
-]
+function pipeline(t: Dict) {
+  return [
+    { index: '01', title: t.pipe01Title, role: t.pipe01Role, artifact: t.pipe01Artifact },
+    { index: '02', title: t.pipe02Title, role: t.pipe02Role, artifact: t.pipe02Artifact },
+    { index: '03', title: t.pipe03Title, role: t.pipe03Role, artifact: t.pipe03Artifact },
+    { index: '04', title: t.pipe04Title, role: t.pipe04Role, artifact: t.pipe04Artifact },
+    { index: '05', title: t.pipe05Title, role: t.pipe05Role, artifact: t.pipe05Artifact },
+    { index: '06', title: t.pipe06Title, role: t.pipe06Role, artifact: t.pipe06Artifact },
+  ]
+}
 
-const ROLES = [
-  {
-    name: '多头',
-    sub: 'bull analyst',
-    input: '策略规格、回测指标',
-    output: '看多论点、乐观情景、收益来源',
-    icon: TrendingUp,
-  },
-  {
-    name: '空头',
-    sub: 'bear analyst',
-    input: '同一份回测与假设',
-    output: '看空论点、失效场景、尾部风险',
-    icon: TrendingDown,
-  },
-  {
-    name: '风控核验',
-    sub: 'risk checker',
-    input: '多空草稿与留存论据',
-    output: '可证伪性核验、无效论据剔除',
-    icon: ShieldCheck,
-  },
-  {
-    name: '裁决',
-    sub: 'judge',
-    input: '三方材料与核验结论',
-    output: '可信度打分、决策与修订建议',
-    icon: Gavel,
-  },
-]
+function roles(t: Dict) {
+  return [
+    { name: t.roleBullName, sub: t.roleBullSub, input: t.roleBullInput, output: t.roleBullOutput, icon: TrendingUp },
+    { name: t.roleBearName, sub: t.roleBearSub, input: t.roleBearInput, output: t.roleBearOutput, icon: TrendingDown },
+    { name: t.roleRiskName, sub: t.roleRiskSub, input: t.roleRiskInput, output: t.roleRiskOutput, icon: ShieldCheck },
+    { name: t.roleJudgeName, sub: t.roleJudgeSub, input: t.roleJudgeInput, output: t.roleJudgeOutput, icon: Gavel },
+  ]
+}
 
-const RISK_SCALE: ReadonlyArray<{
-  level: 'low' | 'medium' | 'high' | 'critical'
-  label: string
-  decisionLabel: string
-  tone: string
-  width: string
-  desc: string
-}> = [
-  { level: 'low', label: '低', decisionLabel: '采纳', tone: 'bg-success', width: '25%', desc: '风险可控，可进入下一环节。' },
-  { level: 'medium', label: '中', decisionLabel: '需修订', tone: 'bg-warning', width: '50%', desc: '存在需修订的问题，列出具体修订项。' },
-  { level: 'high', label: '高', decisionLabel: '拒绝', tone: 'bg-danger', width: '75%', desc: '风险显著，说明否决理由。' },
-  { level: 'critical', label: '致命', decisionLabel: '阻断', tone: 'bg-critical', width: '100%', desc: '致命风险恒为阻断，并写明约束边界。' },
-]
+/** 风险分级：level / tone / width 为语义与视觉常量，仅 label / decisionLabel / desc 随语言变化。 */
+function riskScale(t: Dict) {
+  return [
+    { level: 'low' as const, label: t.riskLowLabel, decisionLabel: t.riskLowDecision, tone: 'bg-success', width: '25%', desc: t.riskLowDesc },
+    { level: 'medium' as const, label: t.riskMediumLabel, decisionLabel: t.riskMediumDecision, tone: 'bg-warning', width: '50%', desc: t.riskMediumDesc },
+    { level: 'high' as const, label: t.riskHighLabel, decisionLabel: t.riskHighDecision, tone: 'bg-danger', width: '75%', desc: t.riskHighDesc },
+    { level: 'critical' as const, label: t.riskCriticalLabel, decisionLabel: t.riskCriticalDecision, tone: 'bg-critical', width: '100%', desc: t.riskCriticalDesc },
+  ]
+}
 
 export function HomePage() {
   const root = useRef<HTMLDivElement>(null)
+  const t = useT()
+  const CAPABILITIES = capabilities(t)
+  const PIPELINE = pipeline(t)
+  const ROLES = roles(t)
+  const RISK_SCALE = riskScale(t)
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -167,31 +123,28 @@ export function HomePage() {
       <section className="hero">
         <div className="shell hero__inner">
           <div className="hero__copy">
-            <h1 className="hero__title">多 Agent 量化研究与风控审计框架</h1>
-            <p className="hero__lede">
-              Quant Asst 把一句策略假设跑成一条可审计的研究流水线：自然语言解析、本地沙箱回测、
-              多空辩论、红队对抗审计、确定性风控分级，最终产出 Markdown 与 HTML 双报告。
-            </p>
+            <h1 className="hero__title">{t.heroTitle}</h1>
+            <p className="hero__lede">{t.heroLede}</p>
             <div className="hero__actions">
               <Button asChild size="lg">
                 <Link to="/studio">
-                  打开工作台
+                  {t.heroOpenStudio}
                   <ArrowRight aria-hidden />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
                 <a href="https://github.com/zyh798-cell/quant-asst" rel="noopener noreferrer">
-                  阅读 GitHub
+                  {t.heroReadGithub}
                 </a>
               </Button>
             </div>
-            <p className="hero__note">仅用于研究与技术演示，不含实盘下单功能，不构成投资建议。</p>
+            <p className="hero__note">{t.heroNote}</p>
             <dl className="hero__stats">
               {[
-                { end: 6, label: '核心能力' },
-                { end: 4, label: '风险级别' },
-                { end: 2, label: '报告格式' },
-                { end: 1, label: '可审计流水线' },
+                { end: 6, label: t.statCapability },
+                { end: 4, label: t.statRiskLevel },
+                { end: 2, label: t.statReportFormat },
+                { end: 1, label: t.statAuditablePipeline },
               ].map((s) => (
                 <div key={s.label} className="hero__stat">
                   <dd className="num hero__stat-num">
@@ -215,10 +168,8 @@ export function HomePage() {
       <section className="section" id="capability">
         <div className="shell">
           <div className="section__head reveal">
-            <h2 className="section__title">核心能力</h2>
-            <p className="section__lede">
-              六项能力覆盖从策略输入到报告归档的完整环节，每项都可通过命令行单独调用。
-            </p>
+            <h2 className="section__title">{t.capabilityTitle}</h2>
+            <p className="section__lede">{t.capabilityLede}</p>
           </div>
           <ul className="capability-grid">
             {CAPABILITIES.map((c) => (
@@ -236,10 +187,8 @@ export function HomePage() {
       <section className="section section--tight" id="pipeline">
         <div className="shell">
           <div className="section__head reveal">
-            <h2 className="section__title">流水线</h2>
-            <p className="section__lede">
-              每一步对应一组角色，前一步的产物是后一步的输入，产物落盘后可单独复查与复跑。
-            </p>
+            <h2 className="section__title">{t.pipelineTitle}</h2>
+            <p className="section__lede">{t.pipelineLede}</p>
           </div>
           <ol className="pipeline">
             {PIPELINE.map((s) => (
@@ -259,10 +208,8 @@ export function HomePage() {
       <section className="section" id="debate">
         <div className="shell">
           <div className="section__head reveal">
-            <h2 className="section__title">多空辩论</h2>
-            <p className="section__lede">
-              四类角色多轮对抗：多头与空头只站自己维度，风控中立核验可证伪性，裁决汇总材料给出结论。
-            </p>
+            <h2 className="section__title">{t.debateTitle}</h2>
+            <p className="section__lede">{t.debateLede}</p>
           </div>
           <ul className="debate-grid">
             {ROLES.map((r) => (
@@ -277,9 +224,9 @@ export function HomePage() {
                   </div>
                 </div>
                 <dl className="role-card__io">
-                  <dt>输入</dt>
+                  <dt>{t.ioInput}</dt>
                   <dd>{r.input}</dd>
-                  <dt>输出</dt>
+                  <dt>{t.ioOutput}</dt>
                   <dd>{r.output}</dd>
                 </dl>
               </li>
@@ -292,10 +239,8 @@ export function HomePage() {
       <section className="section section--tight" id="risk">
         <div className="shell">
           <div className="section__head reveal">
-            <h2 className="section__title">风控分级</h2>
-            <p className="section__lede">
-              综合审计发现取最高级别，映射到确定性决策；致命风险恒为阻断，并强制写明约束边界。
-            </p>
+            <h2 className="section__title">{t.riskTitle}</h2>
+            <p className="section__lede">{t.riskLede}</p>
           </div>
           <ul className="risk-scale">
             {RISK_SCALE.map((r) => (
@@ -318,22 +263,18 @@ export function HomePage() {
       <section className="section" id="report">
         <div className="shell">
           <div className="section__head reveal">
-            <h2 className="section__title">双格式报告</h2>
-            <p className="section__lede">
-              Markdown 面向工程归档，HTML 面向研究查阅，两者同源生成，结论一致。
-            </p>
+            <h2 className="section__title">{t.reportTitle}</h2>
+            <p className="section__lede">{t.reportLede}</p>
           </div>
           <ul className="report-grid">
             <li className="report-card reveal">
               <div className="flex items-center gap-2">
                 <FileText className="size-4 text-accent-ink" aria-hidden />
-                <h3 className="report-card__title">Markdown</h3>
+                <h3 className="report-card__title">{t.reportMarkdownTitle}</h3>
               </div>
-              <p className="report-card__text">
-                结构化文本，含假设、回测口径、辩论留痕、审计发现与风险声明，便于版本管理与评审。
-              </p>
+              <p className="report-card__text">{t.reportMarkdownText}</p>
               <div className="report-card__frame">
-                <svg viewBox="0 0 320 120" role="img" aria-label="Markdown 报告版面示意">
+                <svg viewBox="0 0 320 120" role="img" aria-label={t.reportMarkdownFigure}>
                   <g fill="var(--color-ink-300)">
                     <rect x="20" y="16" width="120" height="10" rx="2" />
                     <rect x="20" y="36" width="260" height="6" rx="2" />
@@ -348,13 +289,11 @@ export function HomePage() {
             <li className="report-card reveal">
               <div className="flex items-center gap-2">
                 <FileText className="size-4 text-accent-ink" aria-hidden />
-                <h3 className="report-card__title">HTML</h3>
+                <h3 className="report-card__title">{t.reportHtmlTitle}</h3>
               </div>
-              <p className="report-card__text">
-                单文件交互式页面，含 K 线、买卖信号、净值与回撤，离线可直接打开。
-              </p>
+              <p className="report-card__text">{t.reportHtmlText}</p>
               <div className="report-card__frame">
-                <svg viewBox="0 0 320 120" role="img" aria-label="HTML 报告版面示意">
+                <svg viewBox="0 0 320 120" role="img" aria-label={t.reportHtmlFigure}>
                   <g stroke="var(--color-ink-300)" strokeWidth="1">
                     <line x1="20" y1="20" x2="20" y2="100" />
                     <line x1="20" y1="100" x2="300" y2="100" />
