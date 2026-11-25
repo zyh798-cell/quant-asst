@@ -23,7 +23,7 @@ import pandas as pd
 from core.markets import Symbol
 from data.adapters.base import MarketDataAdapter
 
-logger = logging.getLogger("quantsentinel.data.us_stock")
+logger = logging.getLogger("quant_asst.data.us_stock")
 
 #: akshare 提供本接口的最低版本（1.20.46 起 ``stock_us_daily`` 更名为 ``stock_us_daily_sina``）
 MIN_AKSHARE_VERSION = "1.20.46"

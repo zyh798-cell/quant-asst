@@ -17,7 +17,7 @@ from core.config import Settings
 from core.llm import complete_structured
 from core.prompts.registry import render_prompt
 from core.schemas import StrictModel
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 from core.trajectory import TrajectoryRecorder
 
 S = TypeVar("S", bound=StrictModel)
@@ -34,7 +34,7 @@ class BaseAgent(ABC, Generic[S]):
         self.settings = settings
         self.recorder = recorder
 
-    def run(self, state: QuantSentinelState) -> dict[str, Any]:
+    def run(self, state: QuantAsstState) -> dict[str, Any]:
         """LangGraph 节点入口：组装消息 -> 结构化输出 -> 落盘 -> 返回 State 增量。
 
         Args:
@@ -61,12 +61,12 @@ class BaseAgent(ABC, Generic[S]):
         )
         return {self.state_key: parsed.model_dump(), **self.merge_keys(state)}
 
-    def merge_keys(self, state: QuantSentinelState) -> dict[str, Any]:
+    def merge_keys(self, state: QuantAsstState) -> dict[str, Any]:
         """同节点额外写入的状态字段（缺省无）。"""
         return {}
 
     @abstractmethod
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         """由子类组装消息：system prompt（模板渲染）+ 上下文（仅工具返回的数据）。"""
 
     def render_system(self, **ctx: Any) -> str:

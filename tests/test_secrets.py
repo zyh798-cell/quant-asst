@@ -25,7 +25,6 @@ def _clean_key_env(monkeypatch):
     for name in KNOWN_LLM_KEYS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv("QUANT_ASST_LLM_MOCK", raising=False)
-    monkeypatch.delenv("QUANTSENTINEL_LLM_MOCK", raising=False)
     monkeypatch.delenv("LITELLM_OFFLINE_MODE", raising=False)
 
 
@@ -64,16 +63,16 @@ def test_describe_keys_format():
 
 def test_load_env_file_loads_and_does_not_override(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
-    env_file.write_text("QUANTSENTINEL_TEST_VAR=from_file\n", encoding="utf-8")
-    monkeypatch.setenv("QUANTSENTINEL_TEST_VAR", "from_env")
+    env_file.write_text("QUANT_ASST_TEST_VAR=from_file\n", encoding="utf-8")
+    monkeypatch.setenv("QUANT_ASST_TEST_VAR", "from_env")
 
     assert load_env_file(env_file) is True
     # 已存在的环境变量不被 .env 覆盖
-    assert os.environ["QUANTSENTINEL_TEST_VAR"] == "from_env"
+    assert os.environ["QUANT_ASST_TEST_VAR"] == "from_env"
 
-    env_file.write_text("QUANTSENTINEL_TEST_VAR2=from_file\n", encoding="utf-8")
+    env_file.write_text("QUANT_ASST_TEST_VAR2=from_file\n", encoding="utf-8")
     load_env_file(env_file)
-    assert os.environ["QUANTSENTINEL_TEST_VAR2"] == "from_file"
+    assert os.environ["QUANT_ASST_TEST_VAR2"] == "from_file"
 
 
 def test_load_env_file_missing_returns_false(tmp_path):
@@ -82,7 +81,7 @@ def test_load_env_file_missing_returns_false(tmp_path):
 
 def test_mock_mode_enables_litellm_offline(monkeypatch):
     """mock 模式必须开启 LiteLLM 离线开关，避免远端 cost map 拉取告警。"""
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "1")
+    monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
     assert llm.is_mock_mode() is True
 
     backend = llm.get_completion_backend()
@@ -92,7 +91,6 @@ def test_mock_mode_enables_litellm_offline(monkeypatch):
 
 def test_real_mode_does_not_force_offline(monkeypatch):
     monkeypatch.delenv("QUANT_ASST_LLM_MOCK", raising=False)
-    monkeypatch.delenv("QUANTSENTINEL_LLM_MOCK", raising=False)
     assert llm.is_mock_mode() is False
 
     backend = llm.get_completion_backend()
@@ -101,29 +99,19 @@ def test_real_mode_does_not_force_offline(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# mock 开关命名兼容（外部代码 review 第 5 项）
+# mock 开关（外部代码 review 第 5 项）
 # ---------------------------------------------------------------------------
 
-def test_new_mock_env_var_is_primary(monkeypatch):
-    """新名 QUANT_ASST_LLM_MOCK 生效。"""
+def test_mock_env_var_enables_mock_backend(monkeypatch):
+    """QUANT_ASST_LLM_MOCK 生效并切换到 MockCompletionBackend。"""
     monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "1")
-    monkeypatch.delenv("QUANTSENTINEL_LLM_MOCK", raising=False)
     assert llm.is_mock_mode() is True
     assert isinstance(llm.get_completion_backend(), llm.MockCompletionBackend)
 
 
-def test_legacy_mock_env_var_still_supported(monkeypatch):
-    """旧名 QUANTSENTINEL_LLM_MOCK 仍向后兼容生效。"""
-    monkeypatch.delenv("QUANT_ASST_LLM_MOCK", raising=False)
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "true")
-    assert llm.is_mock_mode() is True
-    assert isinstance(llm.get_completion_backend(), llm.MockCompletionBackend)
-
-
-def test_new_name_wins_when_both_set(monkeypatch):
-    """两个都设时以新名为准（避免旧值意外关闭 mock）。"""
+def test_mock_env_var_false_value_disables_mock(monkeypatch):
+    """显式假值（如 0）保持真实后端，避免误启用离线模式。"""
     monkeypatch.setenv("QUANT_ASST_LLM_MOCK", "0")
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MOCK", "1")
     assert llm.is_mock_mode() is False
 
 

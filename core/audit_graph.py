@@ -25,7 +25,7 @@ from agents.redteam import RedTeamAgent
 from core.config import Settings
 from core.risk_gate import advisory_for_decision, apply_risk_gate, final_decision
 from core.schemas import FinalAnalysisReport, normalize_risk_level
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 from core.trajectory import TrajectoryRecorder
 
 
@@ -54,7 +54,7 @@ def build_audit_graph(
     officer = FinalRiskOfficerAgent(settings, recorder)
 
     # ---- redteam 节点：审计意见书 + 填充 run_id 标识 ----
-    def redteam_node(state: QuantSentinelState) -> dict[str, Any]:
+    def redteam_node(state: QuantAsstState) -> dict[str, Any]:
         try:
             result = redteam.run(state)
         except Exception as exc:  # noqa: BLE001
@@ -71,7 +71,7 @@ def build_audit_graph(
         return {"redteam_report": report, "redteam_verdict": level}
 
     # ---- gate 节点：确定性门控（不依赖 LLM）----
-    def gate_node(state: QuantSentinelState) -> dict[str, Any]:
+    def gate_node(state: QuantAsstState) -> dict[str, Any]:
         if state.get("error"):
             return {}
         gate = apply_risk_gate(state.get("redteam_report") or {}, threshold)
@@ -82,7 +82,7 @@ def build_audit_graph(
         return {"risk_gate": gate.model_dump()}
 
     # ---- risk_officer 节点：分析草稿 + 合并为最终报告 ----
-    def officer_node(state: QuantSentinelState) -> dict[str, Any]:
+    def officer_node(state: QuantAsstState) -> dict[str, Any]:
         if state.get("error"):
             return {}
         try:
@@ -126,7 +126,7 @@ def build_audit_graph(
             "final_report": final.model_dump(),
         }
 
-    graph = StateGraph(QuantSentinelState)
+    graph = StateGraph(QuantAsstState)
     graph.add_node("redteam", redteam_node)
     graph.add_node("gate", gate_node)
     graph.add_node("risk_officer", officer_node)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""示例策略 01：双均线趋势跟踪（QuantSentinel 策略契约合规模板）。
+"""示例策略 01：双均线趋势跟踪（QuantAsst 策略契约合规模板）。
 
 本文件同时是 **LLM 生成代码的对照模板**：HypothesisAgent 的代码契约
 （``agents/hypothesis.py`` 的 ``CODE_CONTRACT_SYSTEM``）要求生成结果遵守同一约定。

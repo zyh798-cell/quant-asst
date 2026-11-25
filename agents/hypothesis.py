@@ -22,7 +22,7 @@ from core.llm import complete
 from core.llm import complete_structured
 from core.prompts.registry import render_prompt
 from core.schemas import HypothesisSpec
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 from core.trajectory import TrajectoryRecorder
 from tools.sandbox_local import audit_strategy_code
 
@@ -92,7 +92,7 @@ class HypothesisAgent:
 
     # ---- 跳 1：自然语言 -> 结构化假设 ----
 
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         """组装结构化跳消息（system 模板 + 用户原始描述）。"""
         market = state.get("market") or self.settings.default_market.value
         system = render_prompt(
@@ -106,7 +106,7 @@ class HypothesisAgent:
             {"role": "user", "content": state.get("user_input", "")},
         ]
 
-    def run(self, state: QuantSentinelState) -> dict[str, Any]:
+    def run(self, state: QuantAsstState) -> dict[str, Any]:
         """LangGraph 节点入口：两跳输出，结果写回 State 增量。"""
         market = state.get("market") or self.settings.default_market.value
         self.recorder.log(

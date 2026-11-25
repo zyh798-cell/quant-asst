@@ -1,6 +1,6 @@
 """加密货币日线适配器（ccxt，7x24 交易）。
 
-- 交易所默认 binance（可经 QUANTSENTINEL_CRYPTO_EXCHANGE 配置，如 okx / gate）；
+- 交易所默认 binance（可经 QUANT_ASST_CRYPTO_EXCHANGE 配置，如 okx / gate）；
 - 7x24 无停牌（suspended 恒 False）、无涨跌停（NaN）、T+0、可做空；
 - 日期为 UTC 自然日（对齐加密市场惯例）。
 """

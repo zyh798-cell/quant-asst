@@ -5861,7 +5861,7 @@ fastembed = [
 ]
 
 [[package]]
-name = "quantsentinel"
+name = "quant_asst"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

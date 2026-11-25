@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TypedDict
 
 
-class QuantSentinelState(TypedDict, total=False):
+class QuantAsstState(TypedDict, total=False):
     """图的全局状态。``total=False`` 允许各阶段渐进式填充。"""
 
     # ---- 运行元信息 ----

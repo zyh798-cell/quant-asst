@@ -20,7 +20,7 @@ from pathlib import Path
 from core.config import Settings
 from tools.backtest_sandbox import SandboxExecutionError, SandboxExecutor, SandboxResult
 
-logger = logging.getLogger("quantsentinel.sandbox.docker")
+logger = logging.getLogger("quant_asst.sandbox.docker")
 
 #: 容器内固定路径
 _CONTAINER_WORKDIR = "/sandbox/work"
@@ -35,7 +35,7 @@ _ALLOWED_ENV_KEYS: frozenset[str] = frozenset({
 #: 镜像名兼容别名：品牌改名前的旧镜像名仍可启动（避免本地已构建镜像失效）。
 _IMAGE_ALIASES: tuple[str, ...] = (
     "quant-asst-sandbox:latest",
-    "quantsentinel-sandbox:latest",
+    "quant-asst-sandbox:latest",
 )
 
 

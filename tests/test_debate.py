@@ -37,7 +37,7 @@ def test_mock_backend_role_inference() -> None:
     from core.llm import MockCompletionBackend
 
     def msgs(marker: str) -> list[dict[str, str]]:
-        return [{"role": "system", "content": f"你是 QuantSentinel 的{marker}。"}]
+        return [{"role": "system", "content": f"你是 QuantAsst 的{marker}。"}]
 
     assert MockCompletionBackend.infer_role(msgs("多头分析师")) == "bull"
     assert MockCompletionBackend.infer_role(msgs("空头分析师")) == "bear"
@@ -52,10 +52,10 @@ def test_mock_backend_payload_validates() -> None:
 
     backend = get_completion_backend()
     cases = [
-        ("你是 QuantSentinel 的多头分析师。", BullArgument),
-        ("你是 QuantSentinel 的空头分析师。", BearArgument),
-        ("你是 QuantSentinel 的风控核验员。", RiskCheckReport),
-        ("你是 QuantSentinel 的最终裁决员。", DebateVerdict),
+        ("你是 QuantAsst 的多头分析师。", BullArgument),
+        ("你是 QuantAsst 的空头分析师。", BearArgument),
+        ("你是 QuantAsst 的风控核验员。", RiskCheckReport),
+        ("你是 QuantAsst 的最终裁决员。", DebateVerdict),
     ]
     for text, schema in cases:
         resp = backend.completion(

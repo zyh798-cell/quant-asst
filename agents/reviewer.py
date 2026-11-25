@@ -13,7 +13,7 @@ from agents.context import backtest_context, market_label
 from core.base import BaseAgent
 from core.prompts.registry import render_prompt
 from core.schemas import DebateVerdict
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 
 
 def _fmt_risk(checks: list[dict]) -> str:
@@ -42,7 +42,7 @@ class ReviewerAgent(BaseAgent[DebateVerdict]):
     output_schema: ClassVar[type[DebateVerdict]] = DebateVerdict
     state_key: ClassVar[str] = "verdict"
 
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         symbol = state.get("symbol") or ""
         market = state.get("market") or ""
         bull_final = state.get("bull_draft") or {}

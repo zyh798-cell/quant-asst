@@ -7,7 +7,7 @@
 - 项目名：**Quant Asst**
 - 副标题：**LLM Quant Analysis Agent**
 - 仓库：`zyh798-cell/quant-asst`
-- 代码包名：`quantsentinel`（`pyproject.toml`，历史沿用；文档与品牌层统一使用 Quant Asst）
+- 代码包名：`quant_asst`（`pyproject.toml`；v0.1.0 起由 `quantsentinel` 统一改名）
 
 ## Logo 资产
 
@@ -32,6 +32,6 @@ README 头部固定一行元数据：License MIT、Python ≥3.11、测试状态
 
 ## 使用约定
 
-- 品牌名统一为 Quant Asst；代码模块、CLI help 与包名保持 `quantsentinel` 不变。
+- 品牌名统一为 Quant Asst；代码包名、配置前缀（`QUANT_ASST_`）、logger 名与状态类型统一使用 `quant_asst` / `QuantAsst`。
 - 文档保持工程化文风：无 emoji、无口语化表述、无营销话术。
 - 术语（风险等级、决策值、指标名）与 `core/schemas.py` 严格一致。

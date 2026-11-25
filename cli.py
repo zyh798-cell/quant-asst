@@ -360,7 +360,7 @@ def _load_position_fn(strategy_code: str, strategy_file: Path):
     # 在隔离命名空间中加载策略模块（执行面仍由沙箱承担）
     import types
 
-    module = types.ModuleType("quantsentinel_strategy_check")
+    module = types.ModuleType("quant_asst_strategy_check")
     module.__file__ = str(strategy_file)
     code = compile(strategy_code, str(strategy_file), "exec")
     exec(code, module.__dict__)  # noqa: S102 —— 显式加载用户指定策略文件

@@ -157,7 +157,7 @@ def _patch_redteam_payload(monkeypatch, mutate):
 def test_mock_redteam_payload_schema():
     backend = _backend()
     msgs = [
-        {"role": "system", "content": "你是 QuantSentinel 的红队审计员（RedTeamAgent）..."},
+        {"role": "system", "content": "你是 QuantAsst 的红队审计员（RedTeamAgent）..."},
         {"role": "user", "content": "请审计 cn:300750"},
     ]
     assert backend.infer_role(msgs) == "redteam"
@@ -171,7 +171,7 @@ def test_mock_redteam_payload_schema():
 def test_mock_risk_officer_payload_schema():
     backend = _backend()
     msgs = [
-        {"role": "system", "content": "你是 QuantSentinel 的风控综合官（RiskOfficerAgent）..."},
+        {"role": "system", "content": "你是 QuantAsst 的风控综合官（RiskOfficerAgent）..."},
         {"role": "user", "content": "请综合 cn:300750"},
     ]
     assert backend.infer_role(msgs) == "risk_officer"
@@ -184,9 +184,9 @@ def test_mock_risk_officer_payload_schema():
 def test_mock_role_markers_no_crosstalk():
     """风险相关角色 marker 互不串扰。"""
     backend = _backend()
-    redteam_marker = "你是 QuantSentinel 的红队审计员（RedTeamAgent）"
-    officer_marker = "你是 QuantSentinel 的风控综合官（RiskOfficerAgent）"
-    risk_marker = "你是 QuantSentinel 的风控核验员（RiskCheckAgent）"
+    redteam_marker = "你是 QuantAsst 的红队审计员（RedTeamAgent）"
+    officer_marker = "你是 QuantAsst 的风控综合官（RiskOfficerAgent）"
+    risk_marker = "你是 QuantAsst 的风控核验员（RiskCheckAgent）"
     assert backend.infer_role([{"role": "system", "content": redteam_marker}]) == "redteam"
     assert backend.infer_role([{"role": "system", "content": officer_marker}]) == "risk_officer"
     assert backend.infer_role([{"role": "system", "content": risk_marker}]) == "risk"
@@ -395,7 +395,7 @@ def test_normalize_risk_level_fail_closed(raw, expected):
 def test_missing_level_does_not_fall_back_to_low(caplog):
     """缺失等级必须告警并按 critical 处理（不得静默回落 low）。"""
     audit = {}  # 无 overall_risk_level
-    with caplog.at_level("WARNING", logger="quantsentinel.risk"):
+    with caplog.at_level("WARNING", logger="quant_asst.risk"):
         gate = apply_risk_gate(audit)
     assert gate.risk_level == "critical"
     assert gate.trade_suggestion_allowed is False

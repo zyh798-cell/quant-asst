@@ -7,9 +7,9 @@ from core.markets import Market
 
 
 def test_env_prefix_override(monkeypatch) -> None:
-    """QUANTSENTINEL_ 前缀环境变量必须覆盖默认值。"""
-    monkeypatch.setenv("QUANTSENTINEL_LLM_MODEL", "openai/gpt-4o-mini")
-    monkeypatch.setenv("QUANTSENTINEL_TRADE_COST_RATE", "0.002")
+    """QUANT_ASST_ 前缀环境变量必须覆盖默认值。"""
+    monkeypatch.setenv("QUANT_ASST_LLM_MODEL", "openai/gpt-4o-mini")
+    monkeypatch.setenv("QUANT_ASST_TRADE_COST_RATE", "0.002")
     s = Settings(_env_file=None)
     assert s.llm_model == "openai/gpt-4o-mini"
     assert s.trade_cost_rate == 0.002
@@ -32,7 +32,7 @@ def test_default_market_cn() -> None:
 
 def test_market_env_parse(monkeypatch) -> None:
     """市场枚举可从环境变量解析（大小写不敏感由 pydantic 处理为精确匹配枚举值）。"""
-    monkeypatch.setenv("QUANTSENTINEL_DEFAULT_MARKET", "crypto")
+    monkeypatch.setenv("QUANT_ASST_DEFAULT_MARKET", "crypto")
     s = Settings(_env_file=None)
     assert s.default_market == Market.CRYPTO
 

@@ -72,7 +72,7 @@ def normalize_risk_level(raw: object) -> str:
     """
     import logging
 
-    logger = logging.getLogger("quantsentinel.risk")
+    logger = logging.getLogger("quant_asst.risk")
     if not isinstance(raw, str) or not raw.strip():
         logger.warning(
             "风险定级缺失或非法（raw=%r），按 fail-closed 处理为 critical", raw

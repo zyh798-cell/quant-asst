@@ -53,9 +53,9 @@ def test_resolve_image_name_falls_back_to_alias(monkeypatch):
     settings = Settings(_env_file=None, var_dir=Path("var"))
     monkeypatch.setattr(
         "docker.from_env",
-        lambda timeout=5: _FakeDockerClient(["quantsentinel-sandbox:latest"]),
+        lambda timeout=5: _FakeDockerClient(["quant-asst-sandbox:latest"]),
     )
-    assert resolve_image_name(settings) == "quantsentinel-sandbox:latest"
+    assert resolve_image_name(settings) == "quant-asst-sandbox:latest"
 
 
 def test_resolve_image_name_keeps_configured_when_nothing_found(monkeypatch):

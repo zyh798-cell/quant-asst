@@ -13,7 +13,7 @@ from agents.context import backtest_context, debate_material, market_label
 from core.base import BaseAgent
 from core.prompts.registry import render_prompt
 from core.schemas import RiskCheckReport
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 
 
 class RiskCheckAgent(BaseAgent[RiskCheckReport]):
@@ -28,7 +28,7 @@ class RiskCheckAgent(BaseAgent[RiskCheckReport]):
     output_schema: ClassVar[type[RiskCheckReport]] = RiskCheckReport
     state_key: ClassVar[str] = "risk_draft"
 
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         symbol = state.get("symbol") or ""
         market = state.get("market") or ""
         round_no = int(state.get("debate_round") or 1)

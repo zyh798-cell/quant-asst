@@ -37,7 +37,7 @@ from rich.console import Console
 from core.config import Settings
 from tools.backtest_sandbox import SandboxExecutor, SandboxResult
 
-logger = logging.getLogger("quantsentinel.sandbox.local")
+logger = logging.getLogger("quant_asst.sandbox.local")
 console = Console()
 
 #: 红色安全警告文案（构造与执行时强制展示）
@@ -268,7 +268,7 @@ class LocalRestrictedSandbox(SandboxExecutor):
         monitor_thread.join(timeout=2)
 
         if killed_reason:
-            stderr = (stderr or "") + "\n[quantsentinel] " + "; ".join(killed_reason)
+            stderr = (stderr or "") + "\n[quant_asst] " + "; ".join(killed_reason)
         warnings.extend(killed_reason)
 
         duration_ms = int((time.monotonic() - start) * 1000)

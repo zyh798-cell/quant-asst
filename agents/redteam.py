@@ -16,10 +16,10 @@ from agents.context import backtest_context, market_label
 from core.base import BaseAgent
 from core.prompts.registry import render_prompt
 from core.schemas import AuditReport
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 
 
-def _audit_material(state: QuantSentinelState) -> str:
+def _audit_material(state: QuantAsstState) -> str:
     """组装被审计材料：辩论纪要 + 修订策略文本 + 回测上下文。
 
     红队审计针对的是「辩论输出」，故材料以 debate_outcome 为主；
@@ -71,7 +71,7 @@ class RedTeamAgent(BaseAgent[AuditReport]):
     output_schema: ClassVar[type[AuditReport]] = AuditReport
     state_key: ClassVar[str] = "redteam_report"
 
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         symbol = state.get("symbol") or ""
         market = state.get("market") or ""
         material = _audit_material(state)

@@ -38,7 +38,7 @@ from typing import Any
 # 禁止 LiteLLM 后台拉取远端 cost 映射。
 os.environ.setdefault("QUANT_ASST_LLM_MOCK", "1")
 
-#: 项目根目录（QuantSentinel/）
+#: 项目根目录（QuantAsst/）
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))

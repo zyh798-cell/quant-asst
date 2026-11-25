@@ -1,6 +1,6 @@
 """LLM 调用统一封装（LiteLLM）。
 
-- 模型通过 ``QUANTSENTINEL_LLM_MODEL`` 环境变量切换（LiteLLM 格式 provider/model）；
+- 模型通过 ``QUANT_ASST_LLM_MODEL`` 环境变量切换（LiteLLM 格式 provider/model）；
 - 密钥由 LiteLLM 从进程环境变量直接读取（DEEPSEEK_API_KEY / OPENAI_API_KEY ...）；
 - 硬约束 2：结构化输出统一走「JSON 提示 + Pydantic 校验」，失败带错误反馈重试
   ``settings.llm_max_retries`` 次（默认 1 次）。
@@ -23,18 +23,13 @@ from typing import Any, TypeVar
 #: mock 模式真值集合（与 :func:`is_mock_mode` 保持一致）
 _MOCK_TRUE_VALUES = {"1", "true", "yes", "on"}
 
-#: mock 模式开关环境变量：新名（品牌统一后）为准，旧名保留向后兼容。
+#: mock 模式开关环境变量（``QUANTSENTINEL_LLM_MOCK`` 为改名前的旧名，包改名后已移除）。
 MOCK_ENV_VAR = "QUANT_ASST_LLM_MOCK"
-MOCK_ENV_VAR_LEGACY = "QUANTSENTINEL_LLM_MOCK"
 
 
 def _mock_flag() -> str:
-    """读取 mock 开关（新名优先，旧名兜底；大小写不敏感）。"""
-    for name in (MOCK_ENV_VAR, MOCK_ENV_VAR_LEGACY):
-        value = (os.getenv(name, "") or "").strip().lower()
-        if value:
-            return value
-    return ""
+    """读取 mock 开关（大小写不敏感）。"""
+    return (os.getenv(MOCK_ENV_VAR, "") or "").strip().lower()
 
 
 def _enable_offline_mode_if_mock() -> None:
@@ -86,7 +81,7 @@ _silence_litellm_cost_map_fetch()
 
 
 def is_mock_mode() -> bool:
-    """当前是否处于 mock 离线模式（``QUANT_ASST_LLM_MOCK`` 或旧名为真值）。"""
+    """当前是否处于 mock 离线模式（``QUANT_ASST_LLM_MOCK`` 为真值）。"""
     return _mock_flag() in _MOCK_TRUE_VALUES
 
 
@@ -241,8 +236,7 @@ _CODE_MARKER = "策略代码生成器"
 class MockCompletionBackend:
     """脚本化 LLM 后端：按 **prompt 特征词**返回确定性 JSON，供离线测试与 CI。
 
-    触发：环境变量 ``QUANT_ASST_LLM_MOCK`` 取真值（1/true/yes/on）；
-    旧名 ``QUANTSENTINEL_LLM_MOCK`` 仍兼容生效。
+    触发：环境变量 ``QUANT_ASST_LLM_MOCK`` 取真值（1/true/yes/on）。
     仅用于辩论模块等离线场景；真实密钥存在时默认仍走 LiteLLM，不改变既有链路行为。
 
     用法::
@@ -253,9 +247,6 @@ class MockCompletionBackend:
     角色判定：拼接所有 system 文本后按 :data:`_ROLE_MARKERS` 首次匹配；
     未匹配但含代码生成契约关键词时判为 code 跳，否则 unknown。
     """
-
-    #: 兼容旧名（回退路径）
-    _ROLE_MARKERS = _ROLE_MARKERS
 
     def __init__(self) -> None:
         self.call_count = 0
@@ -504,8 +495,7 @@ def _mock_verdict_payload(messages: list[dict[str, str]]) -> dict:
 def get_completion_backend(settings: Settings | None = None):
     """返回 LLM 补全后端：mock 模式（环境变量开启）或真实 LiteLLM。
 
-    mock 判据：``QUANT_ASST_LLM_MOCK`` 为真值（1/true/yes/on，大小写不敏感）；
-    旧名 ``QUANTSENTINEL_LLM_MOCK`` 仍兼容生效。
+    mock 判据：``QUANT_ASST_LLM_MOCK`` 为真值（1/true/yes/on，大小写不敏感）。
     关闭时返回一个转发到 ``litellm.completion`` 的轻量适配器，保持调用侧代码不变。
 
     mock 模式同时设置 ``LITELLM_OFFLINE_MODE=true``，禁止 LiteLLM 拉取任何远端

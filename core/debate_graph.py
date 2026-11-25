@@ -27,7 +27,7 @@ from agents.reviewer import ReviewerAgent
 from agents.risk_officer import RiskCheckAgent
 from core.config import Settings
 from core.schemas import DebateOutcome
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 from core.trajectory import TrajectoryRecorder
 
 
@@ -57,7 +57,7 @@ def build_debate_graph(
 
     def _wrap(agent, node: str):
         """包装节点：异常写入 State['error']，图不崩溃。"""
-        def _node(state: QuantSentinelState) -> dict[str, Any]:
+        def _node(state: QuantAsstState) -> dict[str, Any]:
             try:
                 return agent.run(state)
             except Exception as exc:  # noqa: BLE001
@@ -66,7 +66,7 @@ def build_debate_graph(
         return _node
 
     # ---- 轮次控制 ----
-    def round_start(state: QuantSentinelState) -> dict[str, Any]:
+    def round_start(state: QuantAsstState) -> dict[str, Any]:
         round_no = int(state.get("debate_round") or 0) + 1
         recorder.log(node="meta", event="round_start", payload={"round": round_no})
         return {
@@ -76,7 +76,7 @@ def build_debate_graph(
             "risk_verdict": {},
         }
 
-    def route_next(state: QuantSentinelState) -> str:
+    def route_next(state: QuantAsstState) -> str:
         """达到最大轮次或有错误时进入裁决，否则继续下一轮。"""
         if state.get("error"):
             return "reviewer"
@@ -88,7 +88,7 @@ def build_debate_graph(
     bull_node = _wrap(bull, "bull")
     bear_node = _wrap(bear, "bear")
 
-    def risk_node(state: QuantSentinelState) -> dict[str, Any]:
+    def risk_node(state: QuantAsstState) -> dict[str, Any]:
         """风控校验：写报告并累积逐轮原文/留存论据索引（同节点内合并）。
 
         逐轮原文在此**整体重建**（旧序列 + 本轮草稿 + 当轮报告）：LangGraph 的
@@ -134,7 +134,7 @@ def build_debate_graph(
         }
 
     # ---- 裁决与汇总 ----
-    def review_node(state: QuantSentinelState) -> dict[str, Any]:
+    def review_node(state: QuantAsstState) -> dict[str, Any]:
         try:
             result = reviewer.run(state)
         except Exception as exc:  # noqa: BLE001
@@ -166,7 +166,7 @@ def build_debate_graph(
                               "decision": verdict.get("decision")})
         return {"debate_outcome": outcome.model_dump(), "revised_strategy_text": revision_text}
 
-    graph = StateGraph(QuantSentinelState)
+    graph = StateGraph(QuantAsstState)
     graph.add_node("round_start", round_start)
     graph.add_node("bull", bull_node)
     graph.add_node("bear", bear_node)

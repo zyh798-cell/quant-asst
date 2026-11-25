@@ -1,4 +1,4 @@
-# QuantSentinel 本地基础设施：Qdrant 向量库 + 回测沙箱镜像
+# QuantAsst 本地基础设施：Qdrant 向量库 + 回测沙箱镜像
 #
 # 用法：
 #   docker compose up -d qdrant      # 启动 Qdrant 向量库
@@ -11,7 +11,7 @@
 services:
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: quantsentinel-qdrant
+    container_name: quant-asst-qdrant
     ports:
       - "6333:6333"   # REST API
       - "6334:6334"   # gRPC
@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: Dockerfile.sandbox
     image: quant-asst-sandbox:latest
-    entrypoint: ["python", "-c", "print('quantsentinel sandbox image ready')"]
+    entrypoint: ["python", "-c", "print('quant_asst sandbox image ready')"]
     profiles: ["sandbox"]
 
 volumes:

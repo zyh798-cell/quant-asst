@@ -14,7 +14,7 @@ from agents.context import backtest_context, debate_material, market_label
 from core.base import BaseAgent
 from core.prompts.registry import render_prompt
 from core.schemas import BullArgument
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 
 
 class BullAgent(BaseAgent[BullArgument]):
@@ -24,7 +24,7 @@ class BullAgent(BaseAgent[BullArgument]):
     output_schema: ClassVar[type[BullArgument]] = BullArgument
     state_key: ClassVar[str] = "bull_draft"
 
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         symbol = state.get("symbol") or ""
         market = state.get("market") or ""
         round_no = int(state.get("debate_round") or 1)

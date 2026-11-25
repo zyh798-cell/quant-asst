@@ -17,10 +17,10 @@ from agents.context import backtest_context, market_label
 from core.base import BaseAgent
 from core.prompts.registry import render_prompt
 from core.schemas import FinalAnalysisDraft
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 
 
-def _debate_material(state: QuantSentinelState) -> str:
+def _debate_material(state: QuantAsstState) -> str:
     """把辩论纪要（DebateOutcome dump）格式化为可读文本。"""
     outcome = state.get("debate_outcome") or {}
     if not outcome:
@@ -45,7 +45,7 @@ def _debate_material(state: QuantSentinelState) -> str:
     return "\n".join(lines)
 
 
-def _audit_material(state: QuantSentinelState) -> str:
+def _audit_material(state: QuantAsstState) -> str:
     """把红队审计意见书（AuditReport dump）格式化为可读文本。"""
     report = state.get("redteam_report") or {}
     if not report:
@@ -77,7 +77,7 @@ class FinalRiskOfficerAgent(BaseAgent[FinalAnalysisDraft]):
     output_schema: ClassVar[type[FinalAnalysisDraft]] = FinalAnalysisDraft
     state_key: ClassVar[str] = "risk_report"
 
-    def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+    def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
         symbol = state.get("symbol") or ""
         market = state.get("market") or ""
 

@@ -1,4 +1,4 @@
-# QuantSentinel 回测沙箱镜像（硬约束 3：LLM 生成代码只在容器内执行）
+# QuantAsst 回测沙箱镜像（硬约束 3：LLM 生成代码只在容器内执行）
 #
 # 安全设计：
 # - 数据由宿主预取为 Parquet 后以只读方式挂载进容器，容器内不访问外网；
@@ -20,4 +20,4 @@ USER sandbox
 WORKDIR /sandbox
 
 # 默认入口将被宿主 docker run 覆盖
-CMD ["python", "-c", "print('quantsentinel sandbox ready')"]
+CMD ["python", "-c", "print('quant_asst sandbox ready')"]

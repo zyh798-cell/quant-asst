@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import Iterable
 
-#: QuantSentinel 可识别的 LLM 密钥环境变量（LiteLLM 官方约定名）
+#: QuantAsst 可识别的 LLM 密钥环境变量（LiteLLM 官方约定名）
 KNOWN_LLM_KEYS: tuple[str, ...] = (
     "DEEPSEEK_API_KEY",
     "OPENAI_API_KEY",

@@ -70,14 +70,14 @@ uv run pytest tests/test_audit.py -v
    from agents.context import backtest_context
    from core.base import BaseAgent
    from core.schemas import YourOutput
-   from core.state import QuantSentinelState
+   from core.state import QuantAsstState
 
    class YourAgent(BaseAgent[YourOutput]):
        role: ClassVar[str] = "your_role"
        output_schema: ClassVar[type[YourOutput]] = YourOutput
        state_key: ClassVar[str] = "your_report"
 
-       def build_messages(self, state: QuantSentinelState) -> list[dict[str, str]]:
+       def build_messages(self, state: QuantAsstState) -> list[dict[str, str]]:
            system = self.render_system(today="...", market_label="A股")
            user = backtest_context(state)          # 只注入工具返回的数据（硬约束 1）
            return [{"role": "system", "content": system},

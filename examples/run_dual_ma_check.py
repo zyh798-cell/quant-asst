@@ -116,7 +116,7 @@ def check_cached_real() -> None:
 
 def main() -> int:
     print("=" * 78)
-    print("QuantSentinel 硬编码双均线（5/20）直跑校验")
+    print("QuantAsst 硬编码双均线（5/20）直跑校验")
     print("=" * 78)
     check_synthetic()
     check_cached_real()

@@ -32,7 +32,7 @@ import pandas as pd
 
 from backtest.engine import PositionFn
 
-logger = logging.getLogger("quantsentinel.lookahead")
+logger = logging.getLogger("quant_asst.lookahead")
 
 #: 默认截断检查点集合（前若干行；至少保留 5 根 K 线以满足引擎最小长度）
 DEFAULT_CHECKPOINTS: tuple[int, ...] = (30, 60, 120)

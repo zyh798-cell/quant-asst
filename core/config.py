@@ -1,6 +1,6 @@
-"""QuantSentinel 全局配置。
+"""QuantAsst 全局配置。
 
-- 基于 pydantic-settings，所有配置从环境变量读取（前缀 ``QUANTSENTINEL_``）。
+- 基于 pydantic-settings，所有配置从环境变量读取（前缀 ``QUANT_ASST_``）。
 - LLM 密钥（DEEPSEEK_API_KEY / OPENAI_API_KEY 等）**不进入**本对象：
   由 LiteLLM 按其官方约定直接从进程环境变量读取，
   避免密钥随 trajectory 落盘或出现在日志中。
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     """全局配置对象（进程级单例见 :func:`get_settings`）。"""
 
     model_config = SettingsConfigDict(
-        env_prefix="QUANTSENTINEL_",
+        env_prefix="QUANT_ASST_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",  # .env 中的无关变量直接忽略
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # ---- Qdrant 向量库 ----
     qdrant_mode: str = "local"  # local：进程内模式，零外部依赖
     qdrant_url: str = "http://localhost:6333"
-    qdrant_collection: str = "quantsentinel_mem"
+    qdrant_collection: str = "quant_asst_mem"
     embedding_model: str = "BAAI/bge-small-zh-v1.5"  # fastembed 中文向量化模型
 
     # ---- 运行时根目录（var/ 不入库、不打包；子目录由 var_dir 派生）----

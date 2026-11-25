@@ -29,7 +29,7 @@ import logging
 
 from core.schemas import RISK_RANK, RiskGate, normalize_risk_level
 
-logger = logging.getLogger("quantsentinel.risk")
+logger = logging.getLogger("quant_asst.risk")
 
 #: 默认风险阈值：达到或超过该级别即触发风险提示与约束边界
 DEFAULT_RISK_THRESHOLD = "high"

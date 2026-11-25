@@ -28,7 +28,7 @@ from agents.hypothesis import HypothesisAgent
 from core.config import Settings
 from core.markets import Symbol
 from core.schemas import HypothesisSpec
-from core.state import QuantSentinelState
+from core.state import QuantAsstState
 from core.trajectory import TrajectoryRecorder
 from tools.backtest_sandbox import run_backtest_in_sandbox
 from tools.market_data import get_backtest_frame
@@ -55,7 +55,7 @@ def build_graph(
     agent = HypothesisAgent(settings, recorder)
 
     # ---- 节点 1：HypothesisAgent（自然语言 -> Spec -> 代码）----
-    def hypothesis_node(state: QuantSentinelState) -> dict[str, Any]:
+    def hypothesis_node(state: QuantAsstState) -> dict[str, Any]:
         try:
             return agent.run(state)
         except Exception as exc:  # noqa: BLE001 —— 节点错误写入 State，图不崩溃
@@ -63,7 +63,7 @@ def build_graph(
             return {"error": f"[hypothesis] {type(exc).__name__}: {exc}"}
 
     # ---- 节点 2：沙箱回测（工具节点）----
-    def backtest_node(state: QuantSentinelState) -> dict[str, Any]:
+    def backtest_node(state: QuantAsstState) -> dict[str, Any]:
         if state.get("error"):
             return {}
         try:
@@ -109,10 +109,10 @@ def build_graph(
             return {"error": f"[backtest] {type(exc).__name__}: {exc}"}
 
     # ---- 条件边：hypothesis 出错则短路 ----
-    def route_after_hypothesis(state: QuantSentinelState) -> str:
+    def route_after_hypothesis(state: QuantAsstState) -> str:
         return END if state.get("error") else "sandbox_backtest"
 
-    graph = StateGraph(QuantSentinelState)
+    graph = StateGraph(QuantAsstState)
     graph.add_node("hypothesis", hypothesis_node)
     graph.add_node("sandbox_backtest", backtest_node)
     graph.add_edge(START, "hypothesis")
