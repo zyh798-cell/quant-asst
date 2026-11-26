@@ -155,6 +155,7 @@ URL: <https://zyh798-cell.github.io/quant-asst/>
 - **Only the static front end is deployed**: `server/` and `.env` are not part of the build, so there is no key-exposure surface.
 - One-time setup: in the repository go to **Settings -> Pages -> Build and deployment -> Source** and select **GitHub Actions**.
 - The workbench on the deployed site defaults to offline mock mode and can be explored in full; real mode requires running `server/` locally (the page states this).
+- **Deep links**: the build pre-renders `dist/index.html` into `dist/studio/index.html`, so the `/studio/` deep link returns a true 200. The bare `/studio` form (no trailing slash) is not covered by that directory and its behaviour depends on the hosting platform - always use the trailing slash. Unknown paths with typos fall back to `dist/404.html`, which renders the SPA shell (status code stays 404).
 - For a **complete long-window report produced in real mode**, see [`docs/demo/`](docs/demo/) (cn:600519, 2025-01-05 ~ 2026-11-20, with debate, audit, final report and interactive HTML).
 
 ### Step B: wiring both ends (interface layer + studio)

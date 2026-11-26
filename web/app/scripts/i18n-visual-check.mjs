@@ -56,20 +56,20 @@ async function assertLang(page, markers, label) {
 }
 
 /**
- * SPA 直链用例：GitHub Pages 无 fallback，靠 dist/404.html 兜住未知路径。
- * 这里不走首页点击，而是直接 goto /studio，验证服务端确实返回了 SPA 外壳、
- * 且 react-router 用 basename 正确接管成 StudioPage（URL 保持干净，不出现重复前缀）。
- */
-/**
- * SPA 直链用例：GitHub Pages 无 fallback，靠 dist/404.html 兜住未知路径。
- * 这里不走首页点击，而是直接 goto /studio，验证服务端确实返回了 SPA 外壳、
- * 且 react-router 用 basename 正确接管成 StudioPage（URL 保持干净，不出现重复前缀）。
+ * SPA 深链用例：直接 goto /studio（带尾斜杠，命中构建期预渲染的 dist/studio/index.html），
+ * 验证响应为真 200、react-router 用 basename 接管成 StudioPage（URL 无重复前缀）。
  *
  * 语言显式固定：Playwright 各执行环境的 navigator.language 不一致（本机 zh-CN、
  * CI/无头环境多为 en-US），依赖浏览器探测会让同一用例在不同环境走上不同分支。
  */
 async function checkDirectStudio(page, vp) {
-  await page.goto(`${BASE}studio`, { waitUntil: 'networkidle' })
+  const resp = await page.goto(`${BASE}studio/`, { waitUntil: 'networkidle' })
+  const status = resp?.status() ?? 0
+  // 线上必须拿到真 200（预渲染目录）；本地 preview 同样 200
+  if (status !== 200) {
+    throw new Error(`${vp.name} 直链 studio/ 状态码应为 200，实际 ${status}`)
+  }
+
   const url = page.url()
   if (!/\/studio\/?$/.test(url)) {
     throw new Error(`${vp.name} 直链后 URL 异常：${url}`)
@@ -84,6 +84,20 @@ async function checkDirectStudio(page, vp) {
   await page.screenshot({ path: `${OUT}/${vp.name}-studio-direct-en.png`, fullPage: false })
 }
 
+/**
+ * 无尾斜杠行为记录：GitHub Pages 对 /studio（无斜杠）的处理未被预渲染目录覆盖，
+ * 其行为随托管平台变化，且不是本次交付目标。这里只如实打印状态与最终 URL，
+ * 不参与通过/失败判定。
+ */
+async function probeNoSlash(page) {
+  try {
+    const resp = await page.goto(`${BASE}studio`, { waitUntil: 'domcontentloaded', timeout: 15000 })
+    console.log(`[探测] ${BASE}studio → 状态 ${resp?.status() ?? 'n/a'}，最终 URL ${page.url()}`)
+  } catch (err) {
+    console.log(`[探测] ${BASE}studio → ${String(err.message).split('\n')[0]}`)
+  }
+}
+
 async function main() {
   await mkdir(OUT, { recursive: true })
   const browser = await chromium.launch({
@@ -91,6 +105,10 @@ async function main() {
       process.env.CHROME_PATH ??
       `${process.env.LOCALAPPDATA}\\ms-playwright\\chromium-1248\\chrome-win64\\chrome.exe`,
   })
+
+  const probePage = await browser.newPage()
+  await probeNoSlash(probePage)
+  await probePage.close()
 
   let failed = 0
   const problems = []
@@ -122,8 +140,8 @@ async function main() {
 
     // ---- 工作台（先验直链，再走点击路径）----
     try {
-      // 直链用例：/studio 必须返回 SPA 外壳并渲染出工作台（依赖 dist/404.html），
-      // 并验证直链入口的语言切换。结束时停留在中文。
+      // 深链用例：/studio/ 命中预渲染目录，必须真 200 并渲染出工作台；
+      // 同时验证直链入口的语言切换。结束时停留在英文。
       await checkDirectStudio(page, vp)
 
       // 常规路径：首页点「打开工作台」，确认直链改动没有影响既有入口。

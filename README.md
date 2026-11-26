@@ -155,6 +155,7 @@ npm run preview
 - **只部署静态前端**：`server/` 与 `.env` 不参与构建，无密钥泄漏面。
 - 一次性配置：仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
 - 站点工作台默认 mock 离线模式，可完整演示；真实模式需在本地启动 `server/`（页面已给出提示）。
+- **深链行为**：构建期会把 `dist/index.html` 预渲染为 `dist/studio/index.html`，因此 `/studio/` 直链返回真 200；`/studio`（无尾斜杠）不被该目录覆盖，行为随托管平台而定，建议始终带尾斜杠。拼写错误的未知路径由 `dist/404.html` 兜底渲染 SPA 外壳（状态码仍为 404）。
 - 想看**真实模式跑出来的完整长窗口报告**：见 [`docs/demo/`](docs/demo/)（cn:600519，2025-01-05 ~ 2026-11-20，含辩论 / 审计 / 最终报告与交互式 HTML）。
 
 ### Step B：双端联调（接口层 + 工具站）
