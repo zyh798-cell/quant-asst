@@ -1,5 +1,9 @@
 """美股日线适配器（AkShare / 新浪源）。
 
+价格口径：**实际成交价，不做前复权**。新浪源虽有 ``adjust`` 参数，但美股在
+本框架中无复权概念（回测与信号只依赖价格序列的相对变化，拆股/分红的连续性
+由数据源自带处理）；因此不传该参数，缓存口径段为空。A 股才使用前复权 qfq。
+
 美股无涨跌停机制（limit_up/limit_down 恒 NaN）、无停牌行数据
 （缺日按非交易日处理，不补停牌行）、T+0、可做空。
 
@@ -20,8 +24,10 @@ import logging
 
 import pandas as pd
 
+from typing import Any
+
 from core.markets import Symbol
-from data.adapters.base import MarketDataAdapter
+from data.adapters.base import ADJUST_UNADJUSTED, MarketDataAdapter
 
 logger = logging.getLogger("quant_asst.data.us_stock")
 
@@ -75,7 +81,10 @@ def resolve_us_interface(ak) -> str:
 
 
 class UsStockAdapter(MarketDataAdapter):
-    """美股日线适配器：新浪源，前复权。"""
+    """美股日线适配器：新浪源，实际成交价（不复权）。"""
+
+    #: 美股无复权概念，口径段为空串（缓存文件名保持原样，不与 A 股混淆）
+    ADJUST = ADJUST_UNADJUSTED
 
     def fetch_daily(self, symbol: Symbol, start: str, end: str) -> pd.DataFrame:
         """抓取美股日线并归一为标准 OHLCV schema。"""
@@ -84,7 +93,8 @@ class UsStockAdapter(MarketDataAdapter):
         interface = resolve_us_interface(ak)
         code = symbol.code
 
-        params = {"symbol": code, "adjust": "qfq"}
+        # 不传 adjust：使用接口默认的实际成交价
+        params: dict[str, Any] = {"symbol": code}
         # 新版接口要求 period 参数（缺省可能返回错误粒度），按签名探测注入
         try:
             sig_params = {

@@ -4,7 +4,9 @@
 （旧名已移除）。本文件锁定：
 1. 适配器调用的接口名是新名；
 2. 返回列处理兼容新接口（含/不含 qfq_factor、adjust 列两种形态）；
-3. 归一后 schema 正确。
+3. 归一后 schema 正确；
+4. **价格口径为实际成交价**：适配器不得传 ``adjust`` 做前复权（美股无复权概念，
+   与 A 股的 qfq 口径隔离）。
 
 不联网：以 monkeypatch 替换 akshare 的函数，注入确定性样本。
 """
@@ -30,9 +32,10 @@ def _fake_akshare(captured: dict[str, Any], columns: list[str]) -> types.ModuleT
     """构造假的 akshare 模块，记录调用参数并返回样本 DataFrame。"""
     mod = types.ModuleType("akshare")
 
-    def stock_us_daily_sina(symbol: str, adjust: str = "") -> pd.DataFrame:
+    def stock_us_daily_sina(symbol: str, **kwargs: Any) -> pd.DataFrame:
         captured["symbol"] = symbol
-        captured["adjust"] = adjust
+        # 记录实际传入的关键字参数，用于断言适配器未做复权
+        captured["kwargs"] = dict(kwargs)
         dates = pd.bdate_range("2024-01-01", "2024-01-10")
         n = len(dates)
         data: dict[str, Any] = {
@@ -69,7 +72,9 @@ def test_fetch_daily_uses_renamed_interface(monkeypatch: pytest.MonkeyPatch, col
     df = UsStockAdapter().fetch_daily(Symbol.parse("us:AAPL"), "2024-01-01", "2024-01-31")
 
     assert captured["symbol"] == "AAPL"
-    assert captured["adjust"] == "qfq"
+    # 实际成交价口径：不得传 adjust 做前复权
+    assert "adjust" not in captured["kwargs"]
+    assert UsStockAdapter.ADJUST == ""
     # 标准 schema：列齐全、按日期升序
     assert list(df.columns) == [
         "date", "open", "high", "low", "close", "volume", "amount",
@@ -89,7 +94,7 @@ def test_fetch_daily_filters_to_requested_window(monkeypatch: pytest.MonkeyPatch
 
     mod = _fake_akshare(captured, SAMPLE_COLS_PLAIN)
 
-    def wide_range(symbol: str, adjust: str = "") -> pd.DataFrame:
+    def wide_range(symbol: str, **_kw: Any) -> pd.DataFrame:
         dates = pd.bdate_range("2023-01-01", "2024-03-31")
         n = len(dates)
         return pd.DataFrame({
@@ -109,7 +114,7 @@ def test_fetch_daily_filters_to_requested_window(monkeypatch: pytest.MonkeyPatch
 def test_fetch_daily_empty_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     """接口返回空数据时明确报错，不静默产出空表。"""
     mod = _fake_akshare({}, SAMPLE_COLS_PLAIN)
-    mod.stock_us_daily_sina = lambda symbol, adjust="": pd.DataFrame(columns=SAMPLE_COLS_PLAIN)
+    mod.stock_us_daily_sina = lambda symbol, **_kw: pd.DataFrame(columns=SAMPLE_COLS_PLAIN)
     monkeypatch.setitem(sys.modules, "akshare", mod)
 
     with pytest.raises(ValueError, match="无数据"):
@@ -138,8 +143,9 @@ def test_interface_name_matches_akshare_contract() -> None:
     info = ak.interface_info(resolved)
     params = {p["name"] for p in info["params"]}
     outputs = {o["name"] for o in info["outputs"]}
-    # 适配器调用时固定传 symbol / adjust，二者必须存在于签名中
-    assert {"symbol", "adjust"} <= params
+    # symbol 必传；接口签名中的 adjust 保留但不使用（实际成交价口径）
+    assert "symbol" in params
+    assert "adjust" in params
     # 代码按这些列名取值，缺一不可
     assert {"date", "open", "high", "low", "close", "volume"} <= outputs
 
@@ -188,7 +194,7 @@ def test_fetch_daily_rejects_unexpected_columns(monkeypatch) -> None:
     captured: dict[str, Any] = {}
     mod = _fake_akshare(captured, SAMPLE_COLS_PLAIN)
     # 抹掉 close 列，模拟接口形态变更
-    mod.stock_us_daily_sina = lambda symbol, adjust="": pd.DataFrame({
+    mod.stock_us_daily_sina = lambda symbol, **_kw: pd.DataFrame({
         "date": pd.bdate_range("2024-01-01", "2024-01-05"),
         "open": [1.0] * 5, "high": [1.0] * 5, "low": [1.0] * 5,
         "volume": [1.0] * 5,

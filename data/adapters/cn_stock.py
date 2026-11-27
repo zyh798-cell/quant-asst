@@ -1,17 +1,20 @@
 """A股日线适配器（AkShare / 东财源）。
 
-- 价格：前复权 qfq（回测口径，避免除权跳空）；
+- 价格：前复权 qfq（回测口径，避免除权跳空导致的假金叉/死叉）。美股无复权概念，
+  不使用该口径；两市场口径差异通过 ``ADJUST`` 声明，缓存层据此隔离。
 - 停牌：以交易日历补齐缺失日并标记 suspended=True；
 - 涨跌停：前收 × 板块系数（主板 10%、创业板 300/301 与科创板 688 为 20%、
   北交所 8 开头/4 开头为 30%）；ST 股 5% 需名称数据，暂不区分（研究口径近似）。
+  边界取保守方向（涨停上取整、跌停下取整），避免 qfq 舍入误差把涨停误判为可买。
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from core.markets import Symbol
-from data.adapters.base import MarketDataAdapter
+from data.adapters.base import ADJUST_QFQ, MarketDataAdapter
 
 
 def _limit_pct(code: str) -> float:
@@ -25,6 +28,9 @@ def _limit_pct(code: str) -> float:
 
 class CnStockAdapter(MarketDataAdapter):
     """A 股日线适配器：ak.stock_zh_a_hist（东财源，前复权）。"""
+
+    #: A 股回测统一使用前复权；该值同时是缓存文件名中的口径段。
+    ADJUST = ADJUST_QFQ
 
     def fetch_daily(self, symbol: Symbol, start: str, end: str) -> pd.DataFrame:
         """抓取 A 股日线并归一为标准 OHLCV schema（东财主源，限流时自动回退新浪源）。"""
@@ -56,11 +62,15 @@ class CnStockAdapter(MarketDataAdapter):
         ]
         df = self._fill_missing_trading_days(df, pd.DatetimeIndex(trading_dates))
 
-        # ---- 涨跌停价：前收 × 板块系数，保留 2 位小数（A 股报价精度）----
+        # ---- 涨跌停价：前收 × 板块系数，按 A 股报价精度取保守边界 ----
+        # 用前复权价推算的涨停/跌停价只是近似值；若做四舍五入，可能比真实边界高出
+        # 一个最小报价单位，导致回测把「一字涨停」误判为可买入（假成交）。
+        # 因此向上/向下取整到 0.01，使拦截偏保守：宁可漏拦，不可误放。
         pct = _limit_pct(code)
         prev_close = df["close"].shift(1)
-        df["limit_up"] = (prev_close * (1 + pct)).round(2)
-        df["limit_down"] = (prev_close * (1 - pct)).round(2)
+        tick = 0.01
+        df["limit_up"] = np.ceil(prev_close * (1 + pct) / tick) * tick
+        df["limit_down"] = np.floor(prev_close * (1 - pct) / tick) * tick
         df.loc[df["suspended"], "limit_up"] = df["limit_up"].ffill()
         df.loc[df["suspended"], "limit_down"] = df["limit_down"].ffill()
         df.loc[0, ["limit_up", "limit_down"]] = float("nan")  # 首日无前收
@@ -72,7 +82,7 @@ class CnStockAdapter(MarketDataAdapter):
         """东方财富源（前复权，列名为中文）。"""
         raw = ak.stock_zh_a_hist_em(
             symbol=code, period="daily",
-            start_date=start, end_date=end, adjust="qfq",
+            start_date=start, end_date=end, adjust=self.ADJUST,
         )
         return pd.DataFrame({
             "date": pd.to_datetime(raw["日期"]),
@@ -93,7 +103,7 @@ class CnStockAdapter(MarketDataAdapter):
             sina_code = f"sz{code}"
         else:
             raise ValueError(f"新浪源暂不支持代码 {code}（北交所请稍后重试东财源）")
-        raw = ak.stock_zh_a_daily_sina(symbol=sina_code, adjust="qfq")
+        raw = ak.stock_zh_a_daily_sina(symbol=sina_code, adjust=self.ADJUST)
         df = pd.DataFrame({
             "date": pd.to_datetime(raw["date"]),
             "open": raw["open"].astype(float),

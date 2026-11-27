@@ -3,7 +3,8 @@
 标准 Parquet schema（全部适配器必须归一到此格式）::
 
     date        datetime64[ns]   交易日/自然日（加密货币 7x24 含周末）
-    open/high/low/close  float64 复权价（A 股默认前复权 qfq）
+    open/high/low/close  float64 复权价（口径由适配器 ADJUST 声明：A 股前复权 qfq，
+                                        美股等无复权概念的市场为实际成交价）
     volume      float64          成交量（股/手/张，按市场惯例）
     amount      float64          成交额（无该数据的市场为 NaN）
     suspended   bool             停牌标记（缺失交易日补行；无停牌概念的市场恒 False）
@@ -13,6 +14,9 @@
 涨跌停价说明：由前收盘价 × 板块涨跌幅系数推算（A 股主板 10%、创业板/科创板 20%、
 北交所 30%、期货默认 8% 近似）。前复权价格下的推算存在近似误差（分红除权日），
 精确价以交易所为准 —— 该近似满足研究用途，红队审计时知晓此口径。
+
+缓存隔离：适配器通过 ADJUST 声明复权口径，data.cache 把它写入缓存文件名，
+因此不同口径的行情不会互相污染；旧版本缓存文件（不含口径段）不再命中，自动重建。
 """
 
 from __future__ import annotations
@@ -30,9 +34,17 @@ OHLCV_COLUMNS: ClassVar[list[str]] = [
     "suspended", "limit_up", "limit_down",
 ]
 
+#: 复权口径标识：写入缓存文件名以隔离不同口径（见 data.cache._cache_path）。
+#: 空串表示该市场无复权概念（使用实际成交价/原始行情）。
+ADJUST_UNADJUSTED = ""
+ADJUST_QFQ = "qfq"
+
 
 class MarketDataAdapter(ABC):
     """市场适配器基类：子类实现 fetch_daily，把原始数据归一为标准 schema。"""
+
+    #: 本市场的复权口径（缓存 key 组成部分）。子类按市场覆盖。
+    ADJUST: ClassVar[str] = ADJUST_UNADJUSTED
 
     def __init__(self, cache_dir: str | None = None) -> None:
         """cache_dir 预留（缓存统一由 data.cache 层负责，适配器保持无状态）。"""
@@ -73,14 +85,20 @@ class MarketDataAdapter(ABC):
         """
         if df.empty:
             return df
-        df = df.set_index("date")
+        # 调用方可能在补行之后才推算涨跌停价；此时列尚不存在，需按缺失处理
+        has_limits = {"limit_up", "limit_down"} <= set(df.columns)
+        df = df.set_index("date").sort_index()
         missing = trading_dates.difference(df.index)
         for d in missing:
-            last = df.iloc[-1]
+            # 只能沿用「该日之前」的最后一个有效交易日：取后续数据会引入前视偏差，
+            # 让停牌日价格泄露未来信息。缺失日早于全部数据时回退用最早一行。
+            prior = df.loc[df.index < d]
+            last = prior.iloc[-1] if not prior.empty else df.iloc[0]
             df.loc[d] = {
                 "open": last["close"], "high": last["close"], "low": last["close"],
                 "close": last["close"], "volume": 0.0, "amount": 0.0,
-                "suspended": True, "limit_up": last["limit_up"],
-                "limit_down": last["limit_down"],
+                "suspended": True,
+                "limit_up": last["limit_up"] if has_limits else float("nan"),
+                "limit_down": last["limit_down"] if has_limits else float("nan"),
             }
         return df.sort_index().reset_index().rename(columns={"index": "date"})
