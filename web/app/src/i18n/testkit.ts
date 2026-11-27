@@ -45,6 +45,20 @@ export function reportSummary(): TestSummary {
   return { passed, failed }
 }
 
+/** 异步用例：返回 Promise，由调用方 await（测试入口使用顶层 await）。 */
+export async function testAsync(name: string, fn: () => void | Promise<void>): Promise<void> {
+  try {
+    await fn()
+    passed += 1
+    console.log(`  ok   ${name}`)
+  } catch (err) {
+    failed += 1
+    const message = err instanceof Error ? err.message : String(err)
+    failures.push(`${name}: ${message}`)
+    console.log(`  FAIL ${name}\n       ${message}`)
+  }
+}
+
 export function test(name: string, fn: () => void): void {
   try {
     fn()

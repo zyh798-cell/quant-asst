@@ -6,11 +6,32 @@ import { pathToFileURL } from 'node:url'
 import { rolldown } from 'rolldown'
 
 const root = resolve(import.meta.dirname, '..')
-const entry = resolve(root, 'src/i18n/__tests__/i18n.test.ts')
-const outFile = resolve(root, '.test-dist/i18n.test.mjs')
+
+// 所有测试入口在此登记；打包成单一 bundle 以共享 testkit 的计数与汇总状态。
+const entries = [
+  'src/i18n/__tests__/i18n.test.ts',
+  'src/lib/__tests__/api.test.ts',
+]
+const outFile = resolve(root, '.test-dist/all-tests.mjs')
+
+const VIRTUAL_ID = 'quant-asst-all-tests'
+const virtualSource = entries
+  .map((rel) => `import ${JSON.stringify(resolve(root, rel))}`)
+  .join('\n')
 
 const bundle = await rolldown({
-  input: entry,
+  input: VIRTUAL_ID,
+  plugins: [
+    {
+      name: 'virtual-test-entry',
+      resolveId(id) {
+        return id === VIRTUAL_ID ? id : null
+      },
+      load(id) {
+        return id === VIRTUAL_ID ? virtualSource : null
+      },
+    },
+  ],
   resolve: {
     alias: { '@': resolve(root, 'src') + '/' },
   },

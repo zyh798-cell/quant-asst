@@ -1,6 +1,15 @@
 import { create } from 'zustand'
 
-import { createAnalysis, fetchAnalysis, fetchReport, reportUrl } from '@/lib/api'
+import {
+  ApiRequestError,
+  checkHealth,
+  createAnalysis,
+  fetchAnalysis,
+  fetchReport,
+  reportUrl,
+  toRequestFailure,
+  type RequestFailure,
+} from '@/lib/api'
 import { stageData, toAudit, toBacktest, toDebate, toFinal } from '@/lib/mappers'
 import {
   buildMockAudit,
@@ -79,7 +88,13 @@ interface StudioState {
   config: RunConfig
   stages: Stage[]
   phase: Phase
-  error: string | null
+  /** 失败详情（分类 + 原始原因）；null 表示无错误 */
+  error: RequestFailure | null
+  /**
+   * 真实模式下后端是否可达：null = 未探测，true/false = 最近一次探测结果。
+   * 不可达时禁用运行按钮并给出启动指引，避免裸抛浏览器网络错误。
+   */
+  backendReady: boolean | null
   backend: Backend
   taskId: string | null
   notice: string | null
@@ -89,6 +104,10 @@ interface StudioState {
   final: FinalBrief | null
   report: ReportBrief | null
   setConfig: (patch: Partial<RunConfig>) => void
+  /** 切换 mock / 真实模式；切到真实模式时顺带探测后端可达性 */
+  toggleMock: () => Promise<void>
+  /** 主动探测后端（供 UI 的「重新检测」使用） */
+  probeBackend: () => Promise<void>
   run: () => Promise<void>
   reset: () => void
 }
@@ -120,6 +139,14 @@ export const useStudioStore = create<StudioState>()((set, get) => {
       taskId: null,
       notice: null,
     })
+
+  /** 探测本地后端（2s 超时）：结果写入 backendReady，供按钮与提示渲染 */
+  const probeBackend = async () => {
+    set({ backendReady: null })
+    const ok = await checkHealth()
+    // 探测期间用户可能已切回 mock：仅当仍处于真实模式时采纳结果
+    if (!get().config.mock) set({ backendReady: ok })
+  }
 
   /** 用后端快照增量更新阶段与产物（每阶段完成即渲染，不等全部结束） */
   const applySnapshot = (body: AnalysisStatusResponse) => {
@@ -175,6 +202,19 @@ export const useStudioStore = create<StudioState>()((set, get) => {
     const alive = () => token === runToken
 
     set({ phase: 'running', backend: 'remote', error: null })
+
+    // 运行前再探一次：切换后到点击之间后端可能已经不可达
+    if (!(await checkHealth())) {
+      if (!alive()) return
+      set({
+        phase: 'failed',
+        backendReady: false,
+        error: { kind: 'offline', detail: 'health probe failed' },
+      })
+      return
+    }
+    if (!alive()) return
+
     const created = await createAnalysis({
       strategy: config.strategy,
       symbol: config.symbol,
@@ -205,7 +245,7 @@ export const useStudioStore = create<StudioState>()((set, get) => {
       applySnapshot(body)
 
       if (body.status === 'failed') {
-        throw new Error(body.error || 'task failed')
+        throw new ApiRequestError('task', body.error || 'task execution failed')
       }
       if (body.status === 'completed') break
     }
@@ -227,6 +267,8 @@ export const useStudioStore = create<StudioState>()((set, get) => {
     stages: INITIAL_STAGES,
     phase: 'idle',
     error: null,
+    // 默认 mock，无需探测；切到真实模式时才检查后端可达性
+    backendReady: null,
     backend: 'local',
     taskId: null,
     notice: null,
@@ -237,6 +279,19 @@ export const useStudioStore = create<StudioState>()((set, get) => {
     report: null,
 
     setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
+
+    toggleMock: async () => {
+      const next = !get().config.mock
+      set((s) => ({ config: { ...s.config, mock: next } }))
+      // 只有切到真实模式才需要后端；切回 mock 时清掉探测结果
+      if (next) {
+        await get().probeBackend()
+      } else {
+        set({ backendReady: null })
+      }
+    },
+
+    probeBackend: () => probeBackend(),
 
     run: async () => {
       const token = ++runToken
@@ -276,15 +331,20 @@ export const useStudioStore = create<StudioState>()((set, get) => {
         })
       } catch (err) {
         if (!alive()) return
-        const message = err instanceof Error ? err.message : 'task execution failed'
-        set({ phase: 'failed', error: message })
+        // 保留原始原因（超时 / 网络错误 / 后端返回体），由渲染层按分类选择文案
+        set({ phase: 'failed', error: toRequestFailure(err) })
       }
     },
 
     reset: () => {
       runToken += 1
       // 恢复默认配置（含按当天重算的默认日期窗口），再清空结果
-      set({ phase: 'idle', backend: 'local', config: makeDefaultConfig() })
+      set({
+        phase: 'idle',
+        backend: 'local',
+        backendReady: null,
+        config: makeDefaultConfig(),
+      })
       resetResults()
     },
   }

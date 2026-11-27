@@ -101,6 +101,9 @@ export function StudioPage() {
   const {
     config,
     setConfig,
+    toggleMock,
+    probeBackend,
+    backendReady,
     stages,
     phase,
     error,
@@ -117,6 +120,16 @@ export function StudioPage() {
   } = useStudioStore()
 
   const running = phase === 'running'
+  // 真实模式下后端不可达：禁用运行并给出启动指引，替代裸抛网络错误
+  const backendMissing = !config.mock && backendReady === false
+  const errorTitle =
+    error?.kind === 'http'
+      ? t.errorHttpTitle
+      : error?.kind === 'task'
+        ? t.errorTaskTitle
+        : error?.kind === 'offline'
+          ? t.backendOfflineTitle
+          : t.errorNetworkTitle
 
   const downloadReport = () => {
     if (!report) return
@@ -240,7 +253,7 @@ export function StudioPage() {
                     aria-checked={config.mock}
                     className="switch"
                     data-checked={config.mock}
-                    onClick={() => setConfig({ mock: !config.mock })}
+                    onClick={() => void toggleMock()}
                     disabled={running}
                   >
                     <span className="switch__thumb" data-checked={config.mock} />
@@ -251,9 +264,39 @@ export function StudioPage() {
                     {t.realModeHint}
                   </p>
                 )}
+                {!config.mock && backendReady === null && (
+                  <p className="form-field__hint" role="status">
+                    {t.backendProbing}
+                  </p>
+                )}
+                {backendMissing && (
+                  <div
+                    className="rounded-sm border border-warning/40 bg-warning-soft p-3"
+                    role="alert"
+                  >
+                    <p className="text-label font-medium text-warning-ink">
+                      {t.backendOfflineTitle}
+                    </p>
+                    <p className="mt-1 text-caption text-body">{t.backendOfflineHint}</p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => void probeBackend()}
+                    >
+                      {t.backendRecheck}
+                    </Button>
+                  </div>
+                )}
 
                 <div className="flex gap-2">
-                  <Button type="button" onClick={() => void run()} disabled={running} className="flex-1">
+                  <Button
+                    type="button"
+                    onClick={() => void run()}
+                    disabled={running || backendMissing}
+                    className="flex-1"
+                  >
                     {running ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Play aria-hidden />}
                     {running ? t.actionRunning : t.actionRun}
                   </Button>
@@ -277,8 +320,12 @@ export function StudioPage() {
                   <div className="flex items-start gap-3 rounded-md border border-danger/40 bg-danger-soft p-4" role="alert">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger-ink" aria-hidden />
                     <div>
-                      <p className="text-label font-medium text-danger-ink">{t.taskFailedTitle}</p>
-                      <p className="mt-1 text-caption text-body">{error}</p>
+                      <p className="text-label font-medium text-danger-ink">{errorTitle}</p>
+                      {/* 保留具体原因（超时 / 网络错误 / 后端返回体），便于定位 */}
+                      <p className="mt-1 text-caption text-body">
+                        <span className="sr-only">{t.errorDetailLabel}: </span>
+                        {error.detail}
+                      </p>
                       <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={() => void run()}>
                         {t.actionRetry}
                       </Button>
