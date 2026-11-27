@@ -11,6 +11,7 @@ const root = resolve(import.meta.dirname, '..')
 const entries = [
   'src/i18n/__tests__/i18n.test.ts',
   'src/lib/__tests__/api.test.ts',
+  'src/store/__tests__/studio.test.ts',
 ]
 const outFile = resolve(root, '.test-dist/all-tests.mjs')
 

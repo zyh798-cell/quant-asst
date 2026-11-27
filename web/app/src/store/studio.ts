@@ -281,13 +281,14 @@ export const useStudioStore = create<StudioState>()((set, get) => {
     setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
 
     toggleMock: async () => {
+      // next = 切换后的 mock 值；false 表示进入真实模式，需要探测后端
       const next = !get().config.mock
       set((s) => ({ config: { ...s.config, mock: next } }))
-      // 只有切到真实模式才需要后端；切回 mock 时清掉探测结果
       if (next) {
-        await get().probeBackend()
-      } else {
+        // 切回 mock：不再依赖后端，清掉探测结果
         set({ backendReady: null })
+      } else {
+        await get().probeBackend()
       }
     },
 
