@@ -96,7 +96,47 @@ uv run pytest tests/test_audit.py -v
 7. **补单元测试**：在 `tests/` 增加 `test_<role>.py`，覆盖 schema 校验、
    mock 输出合法性、门控规则与端到端链路。
 
-## 4. 新增示例脚本规范
+## 4. 行情缓存结构与复权口径
+
+### 缓存文件
+
+```
+var/market/<market>/<code>__<start>__<end>[__<adjust>].parquet
+```
+
+- `start` / `end` 统一为 `YYYYMMDD`，便于 `YYYY-MM-DD` 与 `YYYYMMDD` 两种入参命中同一文件。
+- `<adjust>` 为复权口径段，由适配器的 `ADJUST` 类属性声明（见 `data/adapters/base.py`）：
+  - A 股 `cn_stock` → `qfq`（前复权），文件名形如
+    `var/market/cn_stock/600519__20240101__20261128__qfq.parquet`；
+  - 美股 `us_stock` → 空串（实际成交价、无复权概念），文件名形如
+    `var/market/us_stock/AAPL__20240101__20261128.parquet`。
+- 口径写入文件名的目的是**隔离**：切换复权口径必然落到不同文件，不会读到另一口径的数据。
+  旧版本遗留的无口径文件（`<code>__<start>__<end>.parquet`）不再命中，会自动失效重建，
+  无需手动清理（也不应手动改名复用）。
+
+### 复权口径约定
+
+| 市场 | 口径 | 说明 |
+| --- | --- | --- |
+| A 股 | `qfq` 前复权 | 回测口径。消除分红除权日的向下跳空，避免双均线等策略产生假金叉/死叉 |
+| 美股 | 不复权 | 实际成交价。拆股/分红的连续性由数据源自带处理，本框架不做二次调整 |
+| 港股 / 期货 / 加密 | 不复权 | 各适配器按原始行情归一 |
+
+### 涨跌停价的推算
+
+涨跌停价由「前收 × 板块系数」推算，并以最小报价单位（0.01）取**保守边界**：涨停上取整、
+跌停下取整（`data/adapters/cn_stock.py`）。这样即便前复权价本身带有舍入误差，也不会把
+一字涨停误判为可买入。比例关系在复权前后保持不变，因此引擎基于绝对价的涨跌停比较
+（`backtest/engine.py`）在 qfq 数据下结论一致。
+
+### 相关测试
+
+- `tests/test_cn_stock_adapter.py`：qfq 透传、板块系数、保守边界、停牌补齐；
+- `tests/test_adjust_regression.py`：合成除权跳空序列，对照「qfq 不产生假信号 /
+  未复权会产生假信号」，并验证涨跌停判定在两种口径下一致；
+- `tests/test_cache.py`：缓存路径含口径段、不同口径互不命中、遗留旧缓存自动失效。
+
+## 5. 新增示例脚本规范
 
 示例脚本放在 `examples/`，与核心代码隔离，要求：
 
@@ -110,7 +150,7 @@ uv run pytest tests/test_audit.py -v
 - **被测试覆盖**：新示例应加入 `tests/test_examples.py` 的 `_CASES` 列表，
   确保子进程可独立运行。
 
-## 5. 常见问题
+## 6. 常见问题
 
 ### Windows PowerShell 目录切换
 
@@ -174,7 +214,7 @@ uv run python cli.py backtest cn:600519 --lookahead-check   # 检查不通过即
   不再整根挂载项目目录；挂载列表层面显式排除 `.env` 及 `.env.*`；
   容器不接收宿主环境变量。
 
-## 6. 提交前检查清单
+## 7. 提交前检查清单
 
 - [ ] `uv run pytest` 全量通过；
 - [ ] 涉及核心逻辑改动时同步更新 `core/schemas.py` 与相关测试；

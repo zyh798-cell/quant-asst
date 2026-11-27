@@ -38,6 +38,7 @@ Quant Asst is a multi-agent framework for quantitative strategy research and ris
 - **Markdown / HTML dual reports**: an engineering-archive Markdown document plus a standalone single-file Plotly interactive HTML report (candlestick chart, buy/sell signals, equity curve, drawdown).
 - **Offline mock mode**: no LLM key required and no tokens consumed; the scripted backend returns deterministic samples that satisfy the schema, suited to CI and first-time exploration.
 - **Local market-data cache**: daily bars are read from a local Parquet cache first and fetched through the adapter on a miss, so repeated runs do not hit the network again.
+- **Forward-adjusted pricing (qfq)**: A-share daily bars are always fetched forward-adjusted to remove the artificial gap created by cash dividends and rights issues, which would otherwise produce false golden/dead crosses for moving-average strategies. US equities use actual traded prices (no adjustment concept). The adjustment convention is part of the cache file name (`<code>__<start>__<end>__qfq.parquet`), so conventions never contaminate each other.
 
 ## Getting Started
 

@@ -54,7 +54,7 @@
 | LLM 调用层 | `core/llm.py` | `complete` / `complete_structured`；真实模式走 LiteLLM，mock 模式由 `MockCompletionBackend` 按 prompt 首行特征词判定角色并返回确定性样例 |
 | 沙箱 | `tools/sandbox_docker.py` | Release 默认：一次性容器执行，禁网、内存/CPU 限额、非 root、用后即毁 |
 | 沙箱 | `tools/sandbox_local.py` | 开发调试备选：子进程 + AST 静态安检 + 超时/内存限额；隔离不足，禁止生产 |
-| 行情数据 | `tools/market_data.py`、`data/cache.py` | Agent 取数唯一入口；缓存优先读取本地 parquet（`var/market/<market>/<code>__<start>__<end>.parquet`），未命中经适配器抓取并写缓存 |
+| 行情数据 | `tools/market_data.py`、`data/cache.py` | Agent 取数唯一入口；缓存优先读取本地 parquet（`var/market/<market>/<code>__<start>__<end>[__<adjust>].parquet`，复权口径由适配器 `ADJUST` 声明，A 股为 `qfq`、美股为空），未命中经适配器抓取并写缓存 |
 | 数据模型 | `core/schemas.py` | 全部结构化输出的 Pydantic schema（`StrictModel` 禁止额外字段），保证 trajectory 可回放 |
 | 轨迹日志 | `core/trajectory.py` | 每次运行一个 run_id，产出 `var/trajectories/<run_id>.jsonl`，逐事件追加写、实时 flush |
 | 状态机 | `core/graph.py`、`core/debate_graph.py`、`core/audit_graph.py` | LangGraph 编排；节点异常写入 `State["error"]` 并短路，图不崩溃 |
@@ -71,7 +71,7 @@
 | 审计（Step 5） | 辩论 JSON | `AuditReport` + `FinalAnalysisReport` | `output/audit/audit_<ticker>_<timestamp>.md` / `final_<ticker>_<timestamp>.md` |
 | 可视化（Step 6） | 上述三类 + 参考回测明细 | 交互式 HTML + 结构化 JSON | `output/html/final_<ticker>_<timestamp>.html` / `.json` |
 | 全程 | 每次 LLM 调用与角色输出 | trajectory 事件流 | `var/trajectories/<run_id>.jsonl` |
-| 取数 | 标的 + 区间 | parquet 缓存 | `var/market/<market>/<code>__<start>__<end>.parquet` |
+| 取数 | 标的 + 区间 + 复权口径 | parquet 缓存 | `var/market/<market>/<code>__<start>__<end>[__<adjust>].parquet` |
 
 `<ticker>` 为统一 symbol 转文件名安全形式（`cn:600519` -> `cn_600519`）；
 `<timestamp>` 为 `YYYYMMDD_HHMMSS`。HTML 图表的 K 线 / 信号 / 净值 / 回撤明细来自
