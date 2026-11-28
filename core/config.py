@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek/deepseek-chat"  # LiteLLM 格式：provider/model
     llm_temperature: float = 0.2
     llm_max_retries: int = 1  # 硬约束 2：结构化输出格式错误自动重试 1 次
+    #: 多模型对比默认清单（Step L）：逗号分隔的 LiteLLM 模型串（如
+    #: ``deepseek,openai/gpt-4o-mini``）。缺省空表示未配置，CLI 须显式传
+    #: ``--models``；非空时作为未传 ``--models`` 的回落。密钥沿用 .env 机制。
+    llm_models: str = ""
 
     # ---- 市场 ----
     default_market: Market = Market.CN_STOCK

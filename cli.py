@@ -322,6 +322,96 @@ def audit(
 
 
 @app.command()
+def compare(
+    models_raw: str = typer.Option(
+        "", "--models", "-M",
+        help="逗号分隔模型清单（LiteLLM 格式），如 \"deepseek,openai/gpt-4o-mini\"；缺省读配置 QUANT_ASST_LLM_MODELS",
+    ),
+    symbol_raw: str = typer.Option("cn:600519", "--symbol", "-s", help="标的（如 cn:600519）"),
+    hypothesis: str = typer.Option(
+        "双均线趋势策略：MA5 上穿 MA20 满仓，下穿清仓",
+        "--hypothesis", "-h",
+        help="自然语言策略假设（同一份输入给所有模型对比）",
+    ),
+    market: str = typer.Option(None, "--market", "-m", help="目标市场前缀（缺省配置默认）"),
+    rounds: int = typer.Option(3, "--rounds", min=1, max=3, help="辩论轮次上限（各模型一致）"),
+    threshold: str = typer.Option("high", "--threshold", "-t",
+                                  help="风险门控阈值：high（默认）| medium（收紧）"),
+    no_mock: bool = typer.Option(False, "--no-mock",
+                                 help="强制真实 LLM（缺省：未检测到密钥时自动 mock）"),
+    report_lang: str = typer.Option("", "--report-lang", help="报告语言：zh（默认）| en"),
+) -> None:
+    """多模型辩论对比（Step L）：同一策略用多个模型各跑一轮完整辩论 + 红队审计 + 风控门控，
+    逐模型独立互不影响，输出各模型裁决 / 风险 / 交易建议对比与一致 / 分歧汇总（不做加权仲裁）。
+    """
+    from core.comparison import run_model_comparison, write_comparison_artifacts
+    from core.config import get_settings
+    from core.i18n import normalize_report_language
+    from core.llm import is_mock_mode
+    from core.markets import Symbol
+    from core.models import AllModelsSkippedError, split_models
+
+    lang = normalize_report_language(report_lang or None)
+    settings = get_settings()
+
+    # ---- 模型清单：--models 优先，缺省回落配置 llm_models ----
+    models = split_models(models_raw or settings.llm_models)
+    if not models:
+        console.print("[bold red]未提供模型清单：请用 --models 或配置 QUANT_ASST_LLM_MODELS"
+                      "（逗号分隔 LiteLLM 模型串）[/bold red]")
+        raise typer.Exit(code=2)
+
+    # ---- mock 自动判定（与 debate/audit 一致：--no-mock 强制真实；否则无密钥自动 mock）----
+    if no_mock:
+        os.environ.pop("QUANT_ASST_LLM_MOCK", None)
+        mock_mode = False
+    else:
+        if not os.getenv("QUANT_ASST_LLM_MOCK"):
+            if not secret_exists("DEEPSEEK_API_KEY"):
+                os.environ["QUANT_ASST_LLM_MOCK"] = "1"
+                console.print("[yellow]未检测到 DEEPSEEK_API_KEY，已自动切换 mock 离线模式"
+                              "（多模型对比在 mock 下可完整离线演示；加 --no-mock 可强制真实调用）[/yellow]")
+        mock_mode = is_mock_mode()
+
+    symbol = Symbol.parse(symbol_raw).full
+    mkt = market or settings.default_market.value
+
+    with console.status(f"逐模型执行完整辩论 + 红队审计 + 风控门控（{len(models)} 个模型）..."):
+        try:
+            comparison = run_model_comparison(
+                settings, models, hypothesis, symbol, mkt,
+                rounds=rounds, threshold=threshold, mock_mode=mock_mode,
+            )
+        except AllModelsSkippedError as exc:
+            console.print(f"[bold red]{exc}[/bold red]")
+            raise typer.Exit(code=1)
+
+    # ---- 落盘：各模型独立产物 + 对比报告 ----
+    write_comparison_artifacts(comparison, settings.output_dir)
+    from report.comparison import write_comparison_report
+
+    md_path = write_comparison_report(comparison, settings.output_dir, lang)
+
+    ok = comparison.ok_models
+    skipped = comparison.skipped
+    console.print(f"\n[bold cyan]多模型对比[/bold cyan]：{comparison.run_id} | "
+                  f"模式 {comparison.mode} | 运行 {len(ok)} / 跳过 {len(skipped)} 模型")
+    for r in ok:
+        console.print(
+            f"  [green]{r.model}[/green]：决策 {r.decision} | 风险 {r.risk_level} | "
+            f"建议 {'放行' if r.advisory_allowed else '拦截'} | "
+            f"耗时 {r.elapsed_seconds}s | 调用 {r.usage.get('calls', 0)} 次"
+        )
+    for r in skipped:
+        console.print(f"  [yellow]{r.model} 已跳过：{r.reason}[/yellow]")
+    if len(ok) >= 2:
+        same_decision = len({r.decision for r in ok}) == 1
+        console.print(f"[dim]分歧汇总见报告（{'各模型最终决策一致' if same_decision else '存在分歧，单独列出，不做加权仲裁'}）[/dim]")
+    console.print(f"[dim]对比报告：{md_path}[/dim]")
+    console.print(f"[dim]各模型产物：{settings.output_dir / 'comparison' / comparison.run_id}[/dim]")
+
+
+@app.command()
 def fetch(
     symbol_raw: str = typer.Argument(..., help="统一 symbol，如 cn:600519 / us:AAPL / crypto:BTC/USDT"),
     start: str = typer.Option("2024-01-01", "--start", help="起始日 YYYY-MM-DD"),

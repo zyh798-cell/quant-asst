@@ -267,6 +267,49 @@ MESSAGES_ZH: Mapping[str, str] = {
         "并通过红队审计（未来函数 / 幸存者偏差 / 成本敏感性）确认。"
     ),
 
+    # ---- 多模型辩论对比报告（Step L）----
+    "cmp.title": "# 多模型辩论对比报告：{symbol}",
+    "cmp.meta.symbol": "标的",
+    "cmp.meta.market": "市场",
+    "cmp.meta.strategy_desc": "策略描述",
+    "cmp.meta.rounds": "辩论轮次",
+    "cmp.meta.models": "模型清单",
+    "cmp.meta.mode": "执行模式",
+    "cmp.meta.run_id": "对比 run_id",
+    "cmp.disclaimer": (
+        "本报告由 Quant Asst 多模型对比流程自动生成，逐模型独立执行完整辩论与红队审计，"
+        "各模型结果互不影响；仅用于研究与教育，不构成投资建议。"
+    ),
+    "cmp.mode.mock": "mock 离线",
+    "cmp.mode.real": "真实调用",
+    "cmp.compare_title": "## 各模型裁决 / 风险 / 建议 对比（{n} 模型）",
+    "cmp.col.model": "模型",
+    "cmp.col.decision": "最终决策",
+    "cmp.col.risk": "综合风险",
+    "cmp.col.credibility": "可信度",
+    "cmp.col.advisory": "交易建议",
+    "cmp.col.elapsed": "耗时",
+    "cmp.col.tokens": "token 用量",
+    "cmp.advisory_allowed": "放行",
+    "cmp.advisory_blocked": "拦截",
+    "cmp.skipped_title": "## 跳过的模型（{n} 个）",
+    "cmp.skipped_line": "- {model}：{reason}",
+    "cmp.skipped_none": "全部模型均已运行。",
+    "cmp.agreement_title": "## 结论一致与分歧汇总",
+    "cmp.consistent_label": "**一致**（各模型取值相同）",
+    "cmp.disagreements_label": "**分歧**（各模型取值不同；单独列出，不做加权仲裁）",
+    "cmp.consistent_line": "- {field}：{value}",
+    "cmp.disagreement_line": "- {field}：{values}",
+    "cmp.no_disagreement": "全部对比维度各模型取值一致，未出现分歧。",
+    "cmp.no_consistent": "（无一致维度）",
+    "cmp.all_skipped": "（全部模型被跳过，无结果可对比）",
+    "cmp.elapsed_value": "{seconds} 秒",
+    "cmp.tokens_value": "输入 {prompt} + 输出 {completion}（合计 {total}）",
+    "cmp.tokens_na": "N/A",
+    "cmp.dim.decision": "最终决策",
+    "cmp.dim.risk": "综合风险",
+    "cmp.dim.advisory": "交易建议门控",
+
     # ---- Plotly HTML 报告 ----
     "html.lang_attr": "zh-CN",
     "html.title": "Quant Asst 最终量化分析报告：{symbol}",
@@ -602,6 +645,55 @@ MESSAGES_EN: Mapping[str, str] = {
         "must be revalidated on a fully independent out-of-sample window and confirmed by the "
         "red-team audit (look-ahead, survivorship bias, cost sensitivity)."
     ),
+
+    # ---- multi-model comparison report (Step L) ----
+    "cmp.title": "# Multi-Model Debate Comparison Report: {symbol}",
+    "cmp.meta.symbol": "Symbol",
+    "cmp.meta.market": "Market",
+    "cmp.meta.strategy_desc": "Strategy description",
+    "cmp.meta.rounds": "Debate rounds",
+    "cmp.meta.models": "Model list",
+    "cmp.meta.mode": "Execution mode",
+    "cmp.meta.run_id": "Comparison run_id",
+    "cmp.disclaimer": (
+        "Generated automatically by the Quant Asst multi-model comparison pipeline. Each "
+        "model independently runs the full debate and red-team audit, and results are "
+        "independent of one another. "
+        f"{EN_DISCLAIMER}"
+    ),
+    "cmp.mode.mock": "mock offline",
+    "cmp.mode.real": "live",
+    "cmp.compare_title": "## Per-Model Verdict / Risk / Suggestion ({n} models)",
+    "cmp.col.model": "Model",
+    "cmp.col.decision": "Final decision",
+    "cmp.col.risk": "Overall risk",
+    "cmp.col.credibility": "Credibility",
+    "cmp.col.advisory": "Trade suggestion",
+    "cmp.col.elapsed": "Elapsed",
+    "cmp.col.tokens": "Token usage",
+    "cmp.advisory_allowed": "Allowed",
+    "cmp.advisory_blocked": "Blocked",
+    "cmp.skipped_title": "## Skipped Models ({n})",
+    "cmp.skipped_line": "- {model}: {reason}",
+    "cmp.skipped_none": "All models were run.",
+    "cmp.agreement_title": "## Agreement and Disagreement Summary",
+    "cmp.consistent_label": "**Consensus** (identical across models)",
+    "cmp.disagreements_label": (
+        "**Disagreements** (values differ; listed separately, no weighted arbitration)"
+    ),
+    "cmp.consistent_line": "- {field}: {value}",
+    "cmp.disagreement_line": "- {field}: {values}",
+    "cmp.no_disagreement": (
+        "All compared dimensions are identical across models; no disagreement."
+    ),
+    "cmp.no_consistent": "(no consensus dimension)",
+    "cmp.all_skipped": "(all models skipped; no results to compare)",
+    "cmp.elapsed_value": "{seconds} s",
+    "cmp.tokens_value": "prompt {prompt} + completion {completion} (total {total})",
+    "cmp.tokens_na": "N/A",
+    "cmp.dim.decision": "Final decision",
+    "cmp.dim.risk": "Overall risk",
+    "cmp.dim.advisory": "Trade suggestion gate",
 
     # ---- Plotly HTML report ----
     "html.lang_attr": "en",

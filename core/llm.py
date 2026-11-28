@@ -80,6 +80,64 @@ def _silence_litellm_cost_map_fetch() -> None:
 _silence_litellm_cost_map_fetch()
 
 
+# ---------------------------------------------------------------------------
+# 可观测 usage 累加器（Step L 多模型对比用；纯旁路，不改单模型调用行为）
+# ---------------------------------------------------------------------------
+#: 按模型名累计的 token 用量（prompt/completion/calls）。仅用于对比报告展示，
+#: 不参与任何判定；多模型编排按模型逐个 :func:`reset_usage` 后再 :func:`usage_for` 读取。
+_USAGE: dict[str, dict[str, int]] = {}
+
+
+def _usage_entry(model: str) -> dict[str, int]:
+    return _USAGE.setdefault(
+        model, {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0}
+    )
+
+
+def _estimate_mock_tokens(messages: list[dict[str, str]], content: str) -> tuple[int, int]:
+    """mock 下无真实 usage 时的**确定性**近似：按字符数估算（同输入必然同值）。
+
+    真实后端走 ``response.usage``（见下）；mock 后端返回的 content 对同一角色是
+    固定字符串，故估算值恒定，保证多模型确定性测试「两次运行一致」。
+    """
+    prompt_chars = sum(len(m.get("content") or "") for m in messages or [])
+    prompt = max(1, prompt_chars // 4)
+    completion = max(1, len(content or "") // 4)
+    return prompt, completion
+
+
+def _record_usage(
+    model: str, response: Any, messages: list[dict[str, str]], content: str
+) -> None:
+    """把一次补全的 token 用量累加进 :data:`_USAGE`（旁路，异常吞掉不影响主流程）。"""
+    try:
+        entry = _usage_entry(model)
+        entry["calls"] += 1
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            entry["prompt_tokens"] += int(getattr(usage, "prompt_tokens", 0) or 0)
+            entry["completion_tokens"] += int(getattr(usage, "completion_tokens", 0) or 0)
+        else:
+            prompt, completion = _estimate_mock_tokens(messages, content)
+            entry["prompt_tokens"] += prompt
+            entry["completion_tokens"] += completion
+    except Exception:  # noqa: BLE001 —— usage 采集失败绝不影响结构化输出
+        pass
+
+
+def reset_usage(model: str | None = None) -> None:
+    """清空某模型（缺省全部）的 usage 累计；多模型编排按模型粒度重置。"""
+    if model is None:
+        _USAGE.clear()
+    else:
+        _USAGE.pop(model, None)
+
+
+def usage_for(model: str) -> dict[str, int]:
+    """返回某模型已累计的 usage（无记录返回全 0 结构，绝不抛错）。"""
+    return dict(_USAGE.get(model, {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0}))
+
+
 def is_mock_mode() -> bool:
     """当前是否处于 mock 离线模式（``QUANT_ASST_LLM_MOCK`` 为真值）。"""
     return _mock_flag() in _MOCK_TRUE_VALUES
@@ -130,7 +188,9 @@ def complete(
         temperature=settings.llm_temperature,
         **overrides,
     )
-    return response.choices[0].message.content or ""
+    content = response.choices[0].message.content or ""
+    _record_usage(settings.llm_model, response, messages, content)
+    return content
 
 
 def complete_structured(
@@ -178,6 +238,7 @@ def complete_structured(
             # 模型不支持 json_object 模式时降级为普通补全（schema 已注入 system）
             response = backend.completion(**kwargs)
         raw = response.choices[0].message.content or ""
+        _record_usage(settings.llm_model, response, augmented, raw)
         try:
             return schema.model_validate_json(_extract_json(raw))
         except ValidationError as exc:
