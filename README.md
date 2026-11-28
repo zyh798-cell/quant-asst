@@ -87,6 +87,9 @@ uv run python cli.py run "双均线策略，5日线上穿20日线买入，死叉
 ```bash
 # 参数网格寻优 + 样本外验证（纯确定性网格遍历，不调用 LLM）
 uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20,30"
+
+# 多模型辩论对比：同一策略用多个模型各跑一轮，输出各模型裁决/风险/建议对比与分歧汇总
+uv run python cli.py compare -s cn:600519 -M "deepseek,openai/gpt-4o-mini"
 ```
 
 ### CLI 子命令
@@ -99,6 +102,7 @@ uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20
 | `fetch` | 抓取日线行情并写入本地 Parquet / DuckDB 缓存。 |
 | `backtest` | 把策略文件送入沙箱执行回测，验证引擎链路；加 `--lookahead-check` 先做未来函数确定性检查（默认关）。 |
 | `optimize` | 参数网格寻优 + 样本外验证：逐组合回测、按样本内夏普选优并对照总收益排名，劣化时标注 `degraded`；纯确定性、不调用 LLM，报告落盘 `output/optimization/`。 |
+| `compare` | 多模型辩论对比：同一策略假设逐模型独立跑「辩论 → 红队审计 → 风控门控」，互不影响，输出各模型裁决 / 风险 / 建议对比与一致 / 分歧汇总（不做加权仲裁）；缺 key 的模型自动跳过、全缺报错，mock 可完整离线演示，报告落盘 `output/comparison/`。 |
 | `doctor` | 环境自检：配置、依赖、Docker、Qdrant、运行时目录。 |
 | `settings` | 打印当前生效配置（不含任何密钥）。 |
 
@@ -120,7 +124,7 @@ uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20
 
 ```
 quant-asst/
-├── cli.py               # 命令行入口（typer）：run / debate / audit / fetch / backtest / optimize / doctor / settings
+├── cli.py               # 命令行入口（typer）：run / debate / audit / compare / fetch / backtest / optimize / doctor / settings
 ├── core/                # 配置、状态机（LangGraph）、LLM 封装与 mock 后端、schema、风控门控、轨迹
 ├── agents/              # 假设 / 多头 / 空头 / 风控核验 / 裁决 / 红队审计 / 风控综合
 ├── backtest/            # 事件驱动回测引擎、绩效指标、各市场规则

@@ -272,7 +272,54 @@ uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20
   两语言 golden 快照、HTML 静态文案、门控判定与语言无关）+
   `tests/test_api.py`（请求级覆盖、默认 zh、两语言产物 JSON schema 一致）。
 
-## 9. 提交前检查清单
+## 9. 多模型辩论对比（compare）
+
+`cli.py compare` 把「模型可插拔」变成可见交付物：同一策略假设、同一数据、同一辩论
+轮次上限，**逐模型独立**跑完整「多空辩论 -> 红队审计 -> 风控门控」，各模型互不影响
+（每个模型用独立 settings 副本 + 独立 run_id + 独立落盘目录），最终汇总成一份对比
+报告。编排器在 `core/comparison.py`，provider -> 密钥映射在 `core/models.py`，
+报告渲染走 Step K 的 i18n 双语目录（`report/comparison.py` + `core/i18n.py` 的
+`cmp.*` 键）。
+
+```bash
+# 两个模型对比（缺省回落配置 QUANT_ASST_LLM_MODELS；密钥沿用 .env 机制）
+uv run python cli.py compare -s cn:600519 -M "deepseek,openai/gpt-4o-mini"
+
+# mock 离线完整演示（CI 不依赖真实密钥）
+QUANT_ASST_LLM_MOCK=1 uv run python cli.py compare -s cn:600519 \
+  -M "deepseek,openai/gpt-4o-mini" --rounds 2
+```
+
+模型列表配置（两处任一）：
+
+| 方式 | 取值 | 说明 |
+| --- | --- | --- |
+| CLI | `--models "deepseek,openai/gpt-4o-mini"`（逗号/分号/空白分隔，去重保序） | 显式指定，优先 |
+| 环境变量 | `QUANT_ASST_LLM_MODELS=...`（`Settings.llm_models`） | 未传 `--models` 时回落 |
+
+行为约定：
+
+- **密钥 fail-closed**：真实模式下某模型密钥缺失（按 `core.models._PROVIDER_SECRET_ENV`
+  的 provider 前缀判定）-> 该模型跳过并标注原因（不中断其他模型）；未知 provider
+  无法确认密钥需求 -> 保守跳过并标注「无法识别所需密钥」，绝不静默放行；
+  全部模型密钥缺失 -> 抛 `AllModelsSkippedError` 报错退出；
+- **mock 一等公民**：mock 下各模型返回确定性输出，编排全程离线（不取数、不回测，
+  仅 LLM 角色调用），耗时恒 `0.0` 保证「同输入两次运行逐字一致」；
+- **不做加权仲裁**：对比报告只并列各模型裁决 / 风险 / 交易建议门控与
+  一致 / 分歧汇总（分歧单独列出），绝不下「哪个模型更好」的裁判结论；
+- **产物**：`output/comparison/<run_id>/comparison.md`（汇总）+
+  `output/comparison/<run_id>/models/<slug>/{debate,audit,final}.json`（各模型独立）；
+  跳过的模型留 `skipped.json` 占位说明；
+- **确定性**：run_id 与文件名由输入（标的/市场/轮次/模型清单）hash 派生，不含
+  wall-clock；同一输入重复运行生成同名同内容文件；
+- **单模型链路零改动**：编排仅覆写 `settings.llm_model`（`model_copy` 副本），
+  辩论 / 审计 / 门控逻辑本体与既有单模型行为逐字一致。
+
+**测试**：`tests/test_comparison.py`（模型清单解析、单模型可用性、多模型编排独立/
+互不影响/逐个落盘、密钥缺失跳过、全缺失报错、mock 确定性、对比报告结构与双语键齐全、
+一致/分歧汇总）。
+
+## 10. 提交前检查清单
 
 - [ ] `uv run pytest` 全量通过；
 - [ ] 涉及核心逻辑改动时同步更新 `core/schemas.py` 与相关测试；

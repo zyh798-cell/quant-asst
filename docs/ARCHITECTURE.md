@@ -71,6 +71,7 @@
 | 辩论（Step 4） | 策略描述 + 标的 | `DebateOutcome` | `output/debate_reports/<run_id>.md` / `.json` |
 | 审计（Step 5） | 辩论 JSON | `AuditReport` + `FinalAnalysisReport` | `output/audit/audit_<ticker>_<timestamp>.md` / `final_<ticker>_<timestamp>.md` |
 | 可视化（Step 6） | 上述三类 + 参考回测明细 | 交互式 HTML + 结构化 JSON | `output/html/final_<ticker>_<timestamp>.html` / `.json` |
+| 多模型对比（Step L） | 策略描述 + 标的 + 模型清单 | 各模型 `DebateOutcome` + `FinalAnalysisReport` + 一致/分歧汇总 | `output/comparison/<run_id>/comparison.md` + `models/<slug>/{debate,audit,final}.json` |
 | 全程 | 每次 LLM 调用与角色输出 | trajectory 事件流 | `var/trajectories/<run_id>.jsonl` |
 | 取数 | 标的 + 区间 + 复权口径 | parquet 缓存 | `var/market/<market>/<code>__<start>__<end>[__<adjust>].parquet` |
 
@@ -81,6 +82,10 @@
 参数寻优（`backtest/optimizer.py`）位于**回测引擎之上、报告渲染之前**：复用同一份策略代码
 与同一切分点做确定性网格遍历，只读样本内指标选优、样本外仅用于最终劣化验证，
 不进入辩论 / 审计链路（不调用 LLM）。
+
+多模型对比（`core/comparison.py`）位于**辩论 / 审计链路之外**：对同一策略假设逐模型复用既有的
+`build_debate_graph` 与 `build_audit_graph`（仅覆写 `settings.llm_model`），把「模型可插拔」
+变成可见交付物；各模型独立执行、互不影响，汇总报告只呈现一致 / 分歧、不做加权仲裁。
 
 ## 4. 关键数据模型（与代码一致）
 
