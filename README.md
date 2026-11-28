@@ -63,6 +63,15 @@ cp .env.example .env    # 填写 DEEPSEEK_API_KEY
 
 密钥按 LiteLLM 约定从进程环境变量读取，不进入配置对象、运行轨迹或日志。未配置密钥时，`debate` / `audit` 自动进入 mock 离线模式。
 
+### 报告语言
+
+报告（Markdown / Plotly HTML / 辩论纪要 / 红队审计 / 最终分析 / 寻优）默认中文；设 `QUANT_ASST_REPORT_LANG=en` 切换英文，也可在 CLI 用 `--report-lang en` 逐次覆盖（非法值直接报错）。数字与日期格式不随语言变化。
+
+```bash
+QUANT_ASST_REPORT_LANG=en uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20,30"
+# 或在服务端创建任务时传 "report_language": "en"
+```
+
 ### 最小可运行示例
 
 ```bash

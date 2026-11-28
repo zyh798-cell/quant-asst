@@ -242,7 +242,37 @@ uv run python cli.py optimize cn:600519 --start 2024-01-01 --end 2024-12-31 \
 - **测试**：`tests/test_optimizer.py`（解析/展开、准入门槛、双指标对照、
   劣化触发、确定性、真实沙箱参数透传）。
 
-## 8. 提交前检查清单
+## 8. 报告语言（zh / en）
+
+报告层双语由集中式目录 `core/i18n.py` 承担：`MESSAGES_ZH` / `MESSAGES_EN`
+两个扁平 dict 键集合必须完全一致（`tests/test_report_i18n.py` 守护），渲染代码
+不得内联硬编码文案。新增可见文案时**两语言一起加键**，否则一致性测试失败。
+
+配置与覆盖优先级：
+
+| 层级 | 取值方式 | 说明 |
+| --- | --- | --- |
+| 进程配置 | `QUANT_ASST_REPORT_LANG=zh\|en`（`Settings.report_language`） | 默认 `zh`；非法值报错（fail-closed） |
+| CLI | `--report-lang zh\|en`（`debate` / `audit` / `optimize`） | 留空沿用进程配置 |
+| 服务端 | 创建任务请求体 `"report_language": "zh"\|"en"` | 留空沿用进程配置；非法值 422 |
+
+```bash
+# 英文寻优报告
+uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20,30" --report-lang en
+```
+
+约定：
+
+- 数字与日期格式不随语言变化（仍由 `report.markdown._pct` 等格式化函数负责）；
+- 门控结论文案（banner / 约束边界 / blocked 拦截说明）由 `core.risk_gate` 按同一
+  语言产出，**判定结果与语言无关**（放行/拦截、级别归一化不受影响）；
+- 英文免责声明固定用 Release notes 原句，见 `core.i18n.EN_DISCLAIMER`；
+- LLM 生成的实质内容（摘要、审计发现、辩论观点）不在翻译范围内，按模型输出原文呈现。
+- **测试**：`tests/test_report_i18n.py`（键集合一致性、占位符一致性、fail-closed、
+  两语言 golden 快照、HTML 静态文案、门控判定与语言无关）+
+  `tests/test_api.py`（请求级覆盖、默认 zh、两语言产物 JSON schema 一致）。
+
+## 9. 提交前检查清单
 
 - [ ] `uv run pytest` 全量通过；
 - [ ] 涉及核心逻辑改动时同步更新 `core/schemas.py` 与相关测试；

@@ -63,6 +63,15 @@ cp .env.example .env    # fill in DEEPSEEK_API_KEY
 
 Keys are read from process environment variables following the LiteLLM convention; they never enter configuration objects, run traces or logs. When no key is configured, `debate` / `audit` fall back to offline mock mode automatically.
 
+### Report language
+
+Reports (Markdown / Plotly HTML / debate minutes / red-team audit / final analysis / optimization) default to Chinese. Set `QUANT_ASST_REPORT_LANG=en` for English, or override per invocation with `--report-lang en`; unsupported values fail closed. Number and date formats do not change with the language.
+
+```bash
+QUANT_ASST_REPORT_LANG=en uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20,30"
+# or send "report_language": "en" when creating a task through the server API
+```
+
 ### Minimal runnable example
 
 ```bash
