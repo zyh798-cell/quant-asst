@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -49,10 +50,18 @@ def main() -> None:
     import strategy  # 被审计的策略代码（安检已通过）
     position_fn = strategy.generate_positions
 
+    params = spec.get("params")
+
+    def _position(frame):
+        # 参数网格寻优：同一份策略代码按组合注入不同 params（无 params 时保持原行为）
+        if params:
+            return position_fn(frame, params)
+        return position_fn(frame)
+
     rules = MarketRules.load(spec["rules"])
     result = run_event_backtest(
         df,
-        position_fn,
+        _position,
         rules,
         initial_capital=spec["initial_capital"],
         train_ratio=spec["train_ratio"],
@@ -102,6 +111,22 @@ class SandboxExecutionError(RuntimeError):
     """沙箱执行失败（非零退出 / 超时 / 结果文件缺失）。"""
 
 
+def strategy_accepts_params(strategy_code: str) -> bool:
+    """静态判断 ``generate_positions`` 是否接受第二个位置形参或 ``**kwargs``。
+
+    参数网格寻优需要把组合参数注入策略；契约要求入口为
+    ``generate_positions(df, params=None)``。此处仅做 AST 结构检查（不执行代码），
+    对不符合契约的策略直接 fail-closed 报错，避免沙箱内运行时才抛 TypeError。
+    """
+    tree = ast.parse(strategy_code)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "generate_positions":
+            args = node.args
+            positional = len(args.posonlyargs) + len(args.args)
+            return positional >= 2 or args.vararg is not None or args.kwarg is not None
+    return False
+
+
 class BacktestOutput(BaseModel):
     """回测工具完整输出：校验后的指标 + 沙箱执行信息 + 大体积明细。"""
 
@@ -142,6 +167,7 @@ def run_backtest_in_sandbox(
     train_ratio: float | None = None,
     rules_override: MarketRules | None = None,
     run_id: str = "manual",
+    params: dict | None = None,
 ) -> tuple[BacktestResult, SandboxResult]:
     """高层 API：把策略代码 + 行情数据送入沙箱执行回测，返回校验后的结果。
 
@@ -149,7 +175,7 @@ def run_backtest_in_sandbox(
     BacktestResult schema 校验（硬约束 2 的工具侧落实）。
 
     Args:
-        strategy_code: 策略代码文本（须定义 generate_positions(df) -> pd.Series）。
+        strategy_code: 策略代码文本（须定义 generate_positions(df[, params]) -> pd.Series）。
         df: 标准 OHLCV DataFrame。
         symbol: 回测标的。
         settings: 全局配置。
@@ -158,15 +184,22 @@ def run_backtest_in_sandbox(
         train_ratio: 样本内占比；None 用配置默认。
         rules_override: 覆盖市场默认规则（None 用 get_rules）。
         run_id: 工作区/轨迹 ID。
+        params: 策略参数覆盖字典（参数网格寻优逐组合传入）；None/空字典表示用策略自带默认值。
 
     Returns:
         BacktestOutput（result / sandbox / details 三合一）。
 
     Raises:
-        SandboxExecutionError: 沙箱执行失败或结果校验失败。
+        SandboxExecutionError: 沙箱执行失败、结果校验失败，或策略不接受 params 形参。
     """
     workdir = settings.sandbox_workdir / run_id
     workdir.mkdir(parents=True, exist_ok=True)
+
+    if params and not strategy_accepts_params(strategy_code):
+        raise SandboxExecutionError(
+            "策略 generate_positions 未声明 params 形参，无法注入参数网格；"
+            "请按契约改为 generate_positions(df, params=None) 并从模块级 PARAMS 读取默认值"
+        )
 
     # ---- 备齐工作区 ----
     df.to_parquet(workdir / "data.parquet", index=False)
@@ -181,6 +214,8 @@ def run_backtest_in_sandbox(
         "train_ratio": train_ratio if train_ratio is not None else settings.train_test_split,
         "periods_per_year": periods_per_year,
     }
+    if params:
+        spec["params"] = params
     (workdir / "spec.json").write_text(
         json.dumps(spec, ensure_ascii=False, indent=2), encoding="utf-8"
     )

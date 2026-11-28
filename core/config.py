@@ -94,6 +94,13 @@ class Settings(BaseSettings):
         d.mkdir(parents=True, exist_ok=True)
         return d
 
+    @property
+    def optimization_dir(self) -> Path:
+        """参数网格寻优报告目录：``./output/optimization/``（自动创建，Step J）。"""
+        d = self.output_dir / "optimization"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
     def ensure_dirs(self) -> None:
         """确保全部运行时目录存在（幂等）。"""
         for d in (

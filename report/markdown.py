@@ -366,3 +366,259 @@ def write_final_report(
     path = target / f"final_{safe_ticker}_{timestamp}.md"
     path.write_text(render_final_markdown(final_report), encoding="utf-8")
     return str(path)
+
+
+# ---------------------------------------------------------------------------
+# 参数网格寻优报告（Step J）
+# ---------------------------------------------------------------------------
+
+#: 劣化判定阈值（与 backtest/optimizer.py 常量保持一致，报告须原样披露口径）
+_OPTIMIZATION_SHARPE_RATIO = 0.5
+_OPTIMIZATION_DRAWDOWN_EXTRA = 0.10
+
+#: 选优/对照指标默认值（与 backtest/optimizer.py 常量一致，避免循环导入）
+_OPTIMIZATION_PRIMARY_METRIC = "sharpe"
+_OPTIMIZATION_COMPARISON_METRIC = "total_return"
+
+
+def _fmt_num(v: float | int | None, digits: int = 3) -> str:
+    """数值展示：None -> N/A；整数原样；浮点按指定位数。"""
+    if v is None:
+        return "N/A"
+    if isinstance(v, int):
+        return str(v)
+    return f"{v:.{digits}f}"
+
+
+def _fmt_metric(field: str, value: float | int | None) -> str:
+    """按指标语义格式化：收益类带符号百分比、回撤百分比、其余数值。"""
+    if field in ("total_return", "annual_return"):
+        return _signed_pct(value)
+    if field == "max_drawdown":
+        return _pct(value)
+    return _fmt_num(value)
+
+
+def _optimization_param_keys(result: dict[str, Any]) -> list[str]:
+    """取参数字段顺序（与网格声明顺序一致，保证报告确定性）。"""
+    return [str(k) for k in (result.get("grid") or {}).keys()]
+
+
+def render_optimization_markdown(result: dict[str, Any]) -> str:
+    """把 :func:`backtest.optimizer.optimize_grid` 的结果渲染为 Markdown 寻优报告。
+
+    风格与其他报告一致：工程文档风、无 emoji。包含全组合样本内/样本外对比表、
+    样本内最优组合、样本外验证结论与明确的过拟合提示（劣化时原样标注 degraded）。
+    """
+    grid = result.get("grid") or {}
+    param_keys = _optimization_param_keys(result)
+
+    def _grid_desc() -> str:
+        parts = []
+        for key, values in grid.items():
+            joined = ", ".join(str(v) for v in values)
+            parts.append(f"{key} ∈ {{{joined}}}")
+        return "; ".join(parts) or "（无）"
+
+    combos = result.get("combinations") or []
+    best_index = result.get("best_index")
+    best = combos[best_index] if isinstance(best_index, int) and 0 <= best_index < len(combos) else {}
+    best_in = best.get("in_sample") or {}
+    best_out = best.get("out_sample") or {}
+    best_overall = best.get("overall") or {}
+
+    # ---- 准入与对照排名（确定性）----
+    ineligible_by_index = {
+        int(item["index"]): item for item in (result.get("ineligible") or [])
+    }
+    eligible_indexes = result.get("eligible_indexes")
+    if eligible_indexes is None:  # 兼容旧结构：未标记者即视为合格
+        eligible_indexes = [
+            int(row.get("index", -1)) for row in combos
+            if int(row.get("index", -1)) not in ineligible_by_index
+        ]
+    eligible_set = set(int(i) for i in eligible_indexes)
+
+    def _return_rank_key(row: dict[str, Any]) -> tuple:
+        value = (row.get("in_sample") or {}).get(
+            result.get("comparison_metric", _OPTIMIZATION_COMPARISON_METRIC)
+        )
+        return (
+            float("inf") if value is None else -float(value),
+            repr(sorted((row.get("params") or {}).items())),
+        )
+
+    return_ranked = sorted(
+        (row for row in combos if int(row.get("index", -1)) in eligible_set),
+        key=_return_rank_key,
+    )
+    return_rank = {int(row["index"]): pos + 1 for pos, row in enumerate(return_ranked)}
+
+    lines: list[str] = [
+        f"# 参数网格寻优报告：{result.get('symbol', '')}",
+        "",
+        "| 项目 | 内容 |",
+        "| --- | --- |",
+        f"| 标的 | `{result.get('symbol', '')}` |",
+        f"| 市场 | {result.get('market', '')} |",
+        f"| 回测区间 | {result.get('period_start', '')} ~ {result.get('period_end', '')} |",
+        f"| 样本内占比 | {float(result.get('train_ratio', 0.7)):.1%}"
+        f"（样本外起点 {result.get('out_sample_start') or 'N/A'}） |",
+        f"| 参数网格 | {_grid_desc()} |",
+        f"| 组合数 | {result.get('n_combinations', len(combos))} |",
+        f"| 选优指标 | 样本内 {result.get('selection_metric', _OPTIMIZATION_PRIMARY_METRIC)}"
+        f"（固定主指标）；对照指标：样本内 "
+        f"{result.get('comparison_metric', _OPTIMIZATION_COMPARISON_METRIC)} |",
+        f"| 准入门槛 | 样本内成交笔数 ≥ "
+        f"{result.get('min_in_sample_trades', 5)} 笔，不足者不参与选优 |",
+        f"| 初始资金 | ¥{float(result.get('initial_capital', 0.0)):,.0f} |",
+        f"| 沙箱模式 | {result.get('sandbox_mode', '')} |",
+        "",
+        "本报告由 Quant Asst 参数网格寻优流程自动生成，仅用于研究与教育，不构成投资建议。"
+        "寻优过程为纯确定性网格遍历，不调用任何 LLM。",
+        "",
+    ]
+
+    # ---- 全组合对比表 ----
+    lines.append(f"## 全组合样本内 / 样本外指标对比（{len(combos)} 组）\n")
+    header = ["#", *param_keys, "资格", "总收益排名",
+              "样本内总收益", "样本外总收益",
+              "样本内年化", "样本外年化",
+              "样本内最大回撤", "样本外最大回撤",
+              "样本内夏普", "样本外夏普",
+              "样本内笔数", "样本外笔数"]
+    lines.append("| " + " | ".join(header) + " |")
+    lines.append("| " + " | ".join(["---"] * len(header)) + " |")
+    for row in combos:
+        in_m = row.get("in_sample") or {}
+        out_m = row.get("out_sample") or {}
+        params = row.get("params") or {}
+        index = int(row.get("index", -1))
+        cells = [str(index), *(str(params.get(k, "")) for k in param_keys)]
+        cells += [
+            "不合格" if index in ineligible_by_index else "合格",
+            str(return_rank[index]) if index in return_rank else "-",
+            _signed_pct(in_m.get("total_return")), _signed_pct(out_m.get("total_return")),
+            _signed_pct(in_m.get("annual_return")), _signed_pct(out_m.get("annual_return")),
+            _pct(in_m.get("max_drawdown")), _pct(out_m.get("max_drawdown")),
+            _fmt_num(in_m.get("sharpe")), _fmt_num(out_m.get("sharpe")),
+            _fmt_num(in_m.get("n_trades")), _fmt_num(out_m.get("n_trades")),
+        ]
+        lines.append("| " + " | ".join(cells) + " |")
+    lines.append("")
+
+    # ---- 不参与选优的组合 ----
+    lines.append("## 不参与选优的组合（样本内成交笔数不足）\n")
+    if not ineligible_by_index:
+        lines.extend(["全部组合均满足准入门槛。", ""])
+    else:
+        lines.append("| # | 参数 | 样本内笔数 | 原因 |")
+        lines.append("| --- | --- | --- | --- |")
+        for item in sorted(ineligible_by_index.values(), key=lambda x: int(x["index"])):
+            param_text = ", ".join(f"{k}={v}" for k, v in (item.get("params") or {}).items())
+            lines.append(
+                f"| {item['index']} | {param_text} | "
+                f"{_fmt_num(item.get('in_sample_n_trades'))} | {item.get('reason', '')} |"
+            )
+        lines.append("")
+
+    # ---- 最优组合 ----
+    selection_metric = result.get("selection_metric", _OPTIMIZATION_PRIMARY_METRIC)
+    comparison_metric = result.get("comparison_metric", _OPTIMIZATION_COMPARISON_METRIC)
+    lines.append(f"## 最优组合（按样本内 {selection_metric} 选定）\n")
+    if not best:
+        lines.extend(["（无有效组合）", ""])
+    else:
+        lines.append("| 参数 | 取值 |")
+        lines.append("| --- | --- |")
+        for key in param_keys:
+            lines.append(f"| {key} | {best.get('params', {}).get(key, '')} |")
+        lines.append("")
+        lines.append("### 最优组合指标\n")
+        lines.append("| 指标 | 全区间 | 样本内 | 样本外 |")
+        lines.append("| --- | --- | --- | --- |")
+        for field, label in (
+            ("total_return", "总收益"), ("annual_return", "年化收益"),
+            ("max_drawdown", "最大回撤"), ("sharpe", "夏普比率"),
+            ("win_rate", "按笔胜率"), ("n_trades", "成交笔数"),
+        ):
+            lines.append(
+                f"| {label} | {_fmt_metric(field, best_overall.get(field))} "
+                f"| {_fmt_metric(field, best_in.get(field))} "
+                f"| {_fmt_metric(field, best_out.get(field))} |"
+            )
+        lines.append("")
+
+        return_best_index = result.get("return_best_index")
+        lines.append("### 选优指标对照（并列呈现，不做加权综合）\n")
+        lines.append(f"- 主指标（样本内 {selection_metric}）选定：组合 #{best_index}")
+        lines.append(
+            f"- 按样本内 {comparison_metric} 排序首位：组合 #{return_best_index}"
+        )
+        agreement = result.get("metric_agreement")
+        if agreement is True:
+            lines.append("- 结论：两个指标指向同一组合，结论一致。")
+        elif agreement is False:
+            lines.append(
+                "- 结论：两个指标**指向不同组合，结论冲突**；上表已并列呈现，"
+                "本流程不做加权综合，请结合样本外表现与红队审计人工判断。"
+            )
+        lines.append("")
+
+    # ---- 防泄漏声明 ----
+    lines.extend([
+        "## 防泄漏声明",
+        "",
+        f"- 切分点在寻优开始前一次性固定：样本内占比 "
+        f"{float(result.get('train_ratio', 0.7)):.1%}，样本外起点 "
+        f"{result.get('out_sample_start') or 'N/A'}；全部分组合共用同一切分点，"
+        "执行时已校验各组合样本外起点一致。",
+        "- 网格遍历与选优仅使用样本内指标；样本外指标仅在选出最优组合后的最终验证中"
+        "使用一次（劣化判定），不参与任何筛选或排序。",
+        "- 寻优过程为纯确定性网格遍历，不调用任何 LLM，不使用随机数。",
+        "",
+    ])
+
+    # ---- 样本外验证结论 ----
+    lines.append("## 样本外验证结论\n")
+    degraded = bool(result.get("degraded"))
+    reasons = result.get("degradation_reasons") or []
+    if degraded:
+        lines.append("> **判定：degraded（样本外表现显著劣于样本内）**\n")
+        lines.extend(f"- 触发原因：{r}" for r in reasons)
+    else:
+        lines.append("> **判定：未触发劣化阈值**（样本外未显著劣于样本内）\n")
+        lines.append("- 本次最优组合的样本外指标未跌破下述任一阈值。")
+    lines.extend([
+        "",
+        "### 劣化判定口径（确定性阈值）",
+        "",
+        f"- 样本内夏普为正且样本外夏普低于样本内的 {_OPTIMIZATION_SHARPE_RATIO:.0%}；",
+        "- 样本内总收益为正而样本外总收益非正（符号翻转）；",
+        f"- 样本外最大回撤比样本内更深超过 {_OPTIMIZATION_DRAWDOWN_EXTRA:.0%}。",
+        "",
+        "### 过拟合提示",
+        "",
+        "网格寻优按**样本内**指标挑出最优组合，本质是对同一批数据反复试参，"
+        "样本内指标天然被高估；样本外未显著劣化只能说明该组合在既有切分下尚未暴露问题，"
+        "**不能排除过拟合**。任何进入实盘讨论的参数仍须使用完全独立的样本外区间复验，"
+        "并通过红队审计（未来函数 / 幸存者偏差 / 成本敏感性）确认。",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def write_optimization_report(result: dict[str, Any], out_dir) -> str:
+    """渲染并落盘寻优报告到 ``<out_dir>/optimization/optimization_<symbol>_<start>_<end>.md``。
+
+    文件名**不含时间戳**：同一输入重复运行必然生成同名同内容文件（确定性约定）。
+    """
+    from pathlib import Path
+
+    target = Path(out_dir) / "optimization"
+    target.mkdir(parents=True, exist_ok=True)
+    safe_symbol = _sanitize_ticker(result.get("symbol", "unknown"))
+    name = f"optimization_{safe_symbol}_{result.get('period_start', 'na')}_{result.get('period_end', 'na')}.md"
+    path = target / name
+    path.write_text(render_optimization_markdown(result), encoding="utf-8")
+    return str(path)

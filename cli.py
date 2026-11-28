@@ -432,6 +432,167 @@ def backtest(
     _print_backtest_result(output.result, run_id)
 
 
+@app.command()
+def optimize(
+    symbol_raw: str = typer.Argument("cn:600519", help="回测标的（默认 cn:600519）"),
+    grid: str = typer.Option(
+        ..., "--grid", "-g",
+        help='参数网格，如 "short_window=5,10;long_window=20,30"（花括号可省略）',
+    ),
+    start: str = typer.Option("2024-01-01", "--start", help="起始日"),
+    end: str = typer.Option(None, "--end", help="结束日（缺省今天）"),
+    strategy_file: Path = typer.Option(
+        Path("examples/dual_ma.py"), "--strategy", "-s",
+        help="策略文件路径（须定义 generate_positions(df, params=None)）",
+    ),
+    sandbox: str = typer.Option("local", "--sandbox", help="沙箱模式：docker（Release 默认）| local（开发调试）"),
+    capital: float = typer.Option(1_000_000.0, "--capital", help="初始资金"),
+    train_ratio: float = typer.Option(None, "--train-ratio", min=0.1, max=0.9,
+                                      help="样本内占比（缺省用配置 0.7）"),
+) -> None:
+    """参数网格寻优 + 样本外验证（纯确定性网格遍历，不调用 LLM）。"""
+    from backtest.optimizer import (
+        MAX_GRID_COMBINATIONS,
+        expand_grid,
+        optimize_grid,
+        parse_param_grid,
+    )
+    from core.markets import Symbol
+    from tools.market_data import get_backtest_frame
+
+    settings = get_settings()
+    if sandbox == "local":
+        console.print(LOCAL_SANDBOX_CLI_WARNING)  # 红色警告（CLI 层）
+
+    try:
+        param_grid = parse_param_grid(grid)
+        combos = expand_grid(param_grid)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if len(combos) > MAX_GRID_COMBINATIONS:
+        raise typer.BadParameter(
+            f"参数组合数 {len(combos)} 超过上限 {MAX_GRID_COMBINATIONS}，请缩小网格"
+        )
+
+    end = end or datetime.now().strftime("%Y-%m-%d")
+    symbol = Symbol.parse(symbol_raw)
+    strategy_code = strategy_file.read_text(encoding="utf-8")
+
+    with console.status(f"[1/3] 抓取 {symbol.full} 日线 ..."):
+        df = get_backtest_frame(symbol, start, end, settings)
+    console.print(f"    数据：{len(df)} 根 K 线（{df['date'].iloc[0].date()} ~ {df['date'].iloc[-1].date()}）")
+
+    run_id = f"opt-{datetime.now():%Y%m%d-%H%M%S}"
+    try:
+        with console.status(f"[2/3] 逐组合沙箱({sandbox})回测（共 {len(combos)} 组）..."):
+            result = optimize_grid(
+                df, strategy_code, symbol, settings, param_grid,
+                initial_capital=capital,
+                train_ratio=train_ratio,
+                sandbox_mode=sandbox,
+                run_id=run_id,
+            )
+    except (ValueError, RuntimeError) as exc:
+        console.print(f"[bold red]寻优失败：{exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    from report.markdown import write_optimization_report
+
+    with console.status("[3/3] 渲染并落盘寻优报告 ..."):
+        md_path = write_optimization_report(result, settings.output_dir)
+
+    _print_optimization_result(result, md_path)
+
+
+def _print_optimization_result(result: dict, md_path: str) -> None:
+    """用 rich 表格打印寻优对比与样本外结论（数字全部来自优化结果，硬约束 1）。"""
+    grid_keys = [str(k) for k in (result.get("grid") or {}).keys()]
+    combos = result.get("combinations") or []
+    best_index = result.get("best_index")
+    ineligible = {
+        int(item["index"]): item for item in (result.get("ineligible") or [])
+    }
+    eligible_set = {int(i) for i in (result.get("eligible_indexes") or [])}
+
+    def _return_rank_key(row):
+        value = (row.get("in_sample") or {}).get("total_return")
+        return (
+            float("inf") if value is None else -float(value),
+            repr(sorted((row.get("params") or {}).items())),
+        )
+
+    return_ranked = sorted(
+        (row for row in combos if int(row.get("index", -1)) in eligible_set),
+        key=_return_rank_key,
+    )
+    return_rank = {int(row["index"]): pos + 1 for pos, row in enumerate(return_ranked)}
+
+    table = Table(
+        title=f"参数网格寻优对比（{len(combos)} 组；主指标=样本内夏普，"
+              f"门槛≥{result.get('min_in_sample_trades', 5)}笔）"
+    )
+    table.add_column("#", justify="right")
+    for key in grid_keys:
+        table.add_column(key, justify="right")
+    table.add_column("资格", justify="center")
+    table.add_column("收益排名", justify="right")
+    for label in ("样本内收益", "样本外收益", "样本内夏普", "样本外夏普",
+                  "样本内回撤", "样本外回撤", "样本内笔数", "样本外笔数"):
+        table.add_column(label, justify="right")
+
+    def pct(v) -> str:
+        return "-" if v is None else f"{v * 100:+.1f}%"
+
+    def num(v) -> str:
+        return "-" if v is None else (str(v) if isinstance(v, int) else f"{v:.3f}")
+
+    for row in combos:
+        in_m = row.get("in_sample") or {}
+        out_m = row.get("out_sample") or {}
+        params = row.get("params") or {}
+        index = int(row.get("index", -1))
+        cells = [str(index), *(str(params.get(k, "")) for k in grid_keys)]
+        cells += [
+            "不合格" if index in ineligible else "合格",
+            str(return_rank[index]) if index in return_rank else "-",
+            pct(in_m.get("total_return")), pct(out_m.get("total_return")),
+            num(in_m.get("sharpe")), num(out_m.get("sharpe")),
+            pct(in_m.get("max_drawdown")), pct(out_m.get("max_drawdown")),
+            num(in_m.get("n_trades")), num(out_m.get("n_trades")),
+        ]
+        table.add_row(*cells)
+    console.print(table)
+
+    best = combos[best_index] if isinstance(best_index, int) and 0 <= best_index < len(combos) else {}
+    best_in = best.get("in_sample") or {}
+    best_out = best.get("out_sample") or {}
+    console.print(f"\n[bold cyan]最优组合[/bold cyan] #{best_index}：{best.get('params', {})}")
+    console.print(
+        f"样本内 总收益 {pct(best_in.get('total_return'))} / 夏普 {num(best_in.get('sharpe'))}；"
+        f"样本外 总收益 {pct(best_out.get('total_return'))} / 夏普 {num(best_out.get('sharpe'))}"
+    )
+
+    return_best_index = result.get("return_best_index")
+    console.print(
+        f"指标对照：主指标（样本内夏普）选定 #{best_index}；"
+        f"按样本内总收益首位 #{return_best_index}；"
+        f"{'结论一致' if result.get('metric_agreement') else '结论冲突（已并列呈现，不做加权综合）'}"
+    )
+    if ineligible:
+        console.print(
+            f"[yellow]准入门槛：{len(ineligible)} 个组合样本内成交笔数不足 "
+            f"{result.get('min_in_sample_trades', 5)} 笔，未参与选优（明细见报告）[/yellow]"
+        )
+
+    if result.get("degraded"):
+        console.print("[bold red]判定：degraded（样本外表现显著劣于样本内）[/bold red]")
+        for reason in result.get("degradation_reasons") or []:
+            console.print(f"  - {reason}")
+    else:
+        console.print("[green]判定：未触发劣化阈值（不构成对过拟合的排除，详见报告提示）[/green]")
+    console.print(f"[dim]Markdown 报告：{md_path}[/dim]")
+
+
 def _print_backtest_result(result, run_id: str) -> None:
     """用 rich 表格打印回测结果（数字全部来自工具返回，硬约束 1）。"""
     console.print(f"\n[bold cyan]回测结果[/bold cyan]（run_id={run_id}，trajectory 已落盘）")

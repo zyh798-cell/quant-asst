@@ -37,7 +37,7 @@ CODE_CONTRACT_SYSTEM = """\
 你是 Quant Asst 的策略代码生成器。只输出一个 Python 模块源码\
 （无 markdown 围栏、无解释文字），必须满足以下契约：
 
-1. 定义函数 generate_positions(df)，返回 pandas.Series：
+1. 定义函数 generate_positions(df, params=None)，返回 pandas.Series：
    - 输入 df：DataFrame，列为 date/open/high/low/close/volume/amount/suspended/\
 limit_up/limit_down，date 为 datetime64 且按时间升序；
    - 输出：**逐行对应 df 的每一行**的目标仓位（1=满仓多头，0=空仓；仅当假设明确要求\
@@ -46,7 +46,9 @@ limit_up/limit_down，date 为 datetime64 且按时间升序；
    - **禁止对返回值再做 shift(1)**：信号在 t 日收盘后生成、引擎已统一在 t+1 日开盘\
 执行，再 shift 会多滞后一天。直接返回「当日收对应的目标仓位」即可。
 2. 禁止未来函数：禁止负 shift、禁止 center=True 等未来对齐、禁止引用 df 之外的任何数据。
-3. 策略参数写成模块级常量（如 SHORT_WINDOW = 5）。
+3. 策略参数集中定义为模块级字典 PARAMS（如 PARAMS = {"fast_window": 5,\
+"slow_window": 20}）；params 为 None 或缺少某键时一律回落 PARAMS 的默认取值。\
+同一份代码因此可被参数网格寻优（cli.py optimize）逐组合重复调用而无需改动代码。
 4. 允许 import：numpy、pandas；禁止 import os、subprocess、socket、requests、urllib、\
 http、ctypes、shutil、sys、importlib、pickle 等任何其他模块（静态安检会拒绝）。
 5. 禁止 open() 使用绝对路径或包含 ..；禁止 eval/exec/compile/__import__。
@@ -56,13 +58,13 @@ http、ctypes、shutil、sys、importlib、pickle 等任何其他模块（静态
 参考骨架（严格照此风格，只允许 numpy/pandas）：
     import pandas as pd
 
-    FAST_WINDOW = 5
-    SLOW_WINDOW = 20
+    PARAMS = {"fast_window": 5, "slow_window": 20}
 
-    def generate_positions(df):
+    def generate_positions(df, params=None):
+        p = {**PARAMS, **(params or {})}
         close = df["close"].astype(float)
-        fast = close.rolling(FAST_WINDOW).mean()
-        slow = close.rolling(SLOW_WINDOW).mean()
+        fast = close.rolling(p["fast_window"]).mean()
+        slow = close.rolling(p["slow_window"]).mean()
         return (fast > slow).astype(float)
 """
 
