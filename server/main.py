@@ -36,7 +36,7 @@ def create_app(manager: TaskManager | None = None) -> FastAPI:
             "多智能体协作量化研究引擎接口层。仅用于研究与教育，不构成投资建议，"
             "不提供实盘下单能力。"
         ),
-        version="0.1.0",
+        version="0.2.0",
     )
     app.add_middleware(
         CORSMiddleware,

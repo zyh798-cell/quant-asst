@@ -1,6 +1,6 @@
 [project]
 name = "quant_asst"
-version = "0.1.0"
+version = "0.2.0"
 description = "QuantAsst - 多智能体协作的多市场量化研究引擎（仅用于教育与研究，不构成投资建议）"
 readme = "README.md"
 requires-python = ">=3.11.5"   # akshare>=1.20.46（美股接口更名）要求 Python>=3.11.5

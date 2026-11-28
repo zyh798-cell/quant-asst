@@ -3,4 +3,4 @@
 随 Step 2 起交付：market_data.py / backtest_sandbox.py / vector_memory.py。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

@@ -4,4 +4,4 @@
 统一输出 OHLCV Parquet schema（见 backtest/market_rules.py 模块注释）。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
