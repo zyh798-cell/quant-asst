@@ -20,6 +20,8 @@ from fastapi.testclient import TestClient
 from server.main import create_app
 from server.tasks import TaskManager, redact_secrets
 
+from core.i18n import EN_DISCLAIMER
+
 # ---------------------------------------------------------------------------
 # 夹具
 # ---------------------------------------------------------------------------
@@ -118,6 +120,7 @@ def test_create_returns_initial_state(client: TestClient) -> None:
     assert set(data["request"]) == {
         "strategy", "symbol", "market", "period_start", "period_end",
         "mode", "sandbox", "debate_rounds", "risk_threshold", "initial_capital",
+        "report_language",
     }
 
 
@@ -343,3 +346,88 @@ def test_initial_capital_is_threaded_to_backtest_and_report(
     archived = json.loads(json_files[0].read_text(encoding="utf-8"))
     assert archived["request"]["initial_capital"] == capital
     assert archived["backtest"]["initial_capital"] == capital
+
+
+# --------------------------------------------------------------------------
+# 报告双语（Step K）：请求级覆盖、默认 zh、两语言产物 schema 一致
+# --------------------------------------------------------------------------
+
+
+def _run_task(client: TestClient, **overrides: Any) -> dict[str, Any]:
+    data = _create(client, **overrides)
+    final = _wait_terminal(client, data["id"])
+    assert final["status"] == "completed", final.get("error")
+    return final
+
+
+def test_report_language_english_end_to_end(client: TestClient) -> None:
+    """report_language=en 时 Markdown / HTML 报告的静态文案为英文。"""
+    final = _run_task(client, report_language="en")
+    task_id = final["id"]
+    assert final["request"]["report_language"] == "en"
+
+    md = client.get(f"/api/analyses/{task_id}/report", params={"format": "md"})
+    assert md.status_code == 200
+    for marker in (
+        "# Bull/Bear Debate Report:",
+        "## Audit Conclusion",
+        "# Final Quantitative Analysis Report:",
+        EN_DISCLAIMER,
+    ):
+        assert marker in md.text
+    assert "## 逐轮辩论原文" not in md.text
+
+    html = client.get(f"/api/analyses/{task_id}/report", params={"format": "html"})
+    assert html.status_code == 200
+    assert '<html lang="en">' in html.text
+    assert "Risk Metrics" in html.text and "Analysis Summary" in html.text
+
+
+def test_report_language_defaults_to_chinese(client: TestClient) -> None:
+    """不指定 report_language 时沿用默认中文（行为不变）。"""
+    final = _run_task(client)
+    assert final["request"]["report_language"] == ""
+    md = client.get(f"/api/analyses/{final['id']}/report", params={"format": "md"})
+    assert "## 逐轮辩论原文" in md.text
+    assert "# 最终量化分析报告：" in md.text
+
+
+def test_report_language_invalid_rejected(client: TestClient) -> None:
+    """非法语言值在请求校验阶段即被拒绝（fail-closed，422）。"""
+    resp = client.post("/api/analyses", json={
+        "strategy": STRATEGY, "symbol": SYMBOL, "market": "cn_stock",
+        "period_start": START, "period_end": END, "mode": "mock",
+        "sandbox": "local", "report_language": "fr",
+    })
+    assert resp.status_code == 422
+
+
+def test_bilingual_artifacts_json_schema_parity(client: TestClient, test_settings) -> None:
+    """同一合成任务两语言产物的结构化 JSON schema 必须一致（只文案不同）。"""
+    zh_final = _run_task(client, report_language="zh")
+    en_final = _run_task(client, report_language="en")
+
+    def _load(task_id: str) -> dict[str, Any]:
+        files = list((test_settings.report_dir / task_id).glob("analysis_*.json"))
+        assert len(files) == 1
+        return json.loads(files[0].read_text(encoding="utf-8"))
+
+    zh, en = _load(zh_final["id"]), _load(en_final["id"])
+    assert set(zh) == set(en)
+    assert set(zh["request"]) == set(en["request"])
+    for field in ("hypothesis", "backtest", "debate", "audit", "risk_gate", "final_report"):
+        assert set(zh[field]) == set(en[field]), field
+    assert set(zh["risk_gate"]) == set(en["risk_gate"])
+
+    # 各阶段产物的键集合同样与语言无关
+    zh_stages = {s["stage"]: s["data"] for s in zh_final["stages"]}
+    en_stages = {s["stage"]: s["data"] for s in en_final["stages"]}
+    assert set(zh_stages) == set(en_stages)
+    for stage in zh_stages:
+        assert set(zh_stages[stage]) == set(en_stages[stage]), stage
+
+    # 门控判定字段完全一致（语言只影响文案）
+    assert zh["risk_gate"]["risk_level"] == en["risk_gate"]["risk_level"]
+    assert (zh["risk_gate"]["trade_suggestion_allowed"]
+            == en["risk_gate"]["trade_suggestion_allowed"])
+    assert zh["final_report"]["final_decision"] == en["final_report"]["final_decision"]

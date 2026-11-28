@@ -36,6 +36,9 @@ SandboxMode = Literal["local", "docker"]
 #: 报告格式
 ReportFormat = Literal["md", "html"]
 
+#: 报告语言（与 core.i18n 一致；空串表示沿用进程配置默认）
+ReportLang = Literal["zh", "en"]
+
 #: 市场别名 -> 枚举值（口径与 ``core.markets._MARKET_ALIASES`` 保持一致）
 _MARKET_ALIASES: dict[str, str] = {
     "cn": "cn_stock",
@@ -85,6 +88,21 @@ class AnalysisCreateRequest(BaseModel):
         default="high", description="风险门控阈值：high（默认）| medium（收紧）"
     )
     initial_capital: float = Field(default=1_000_000.0, gt=0, description="初始资金")
+    report_language: str = Field(
+        default="",
+        description="报告语言：zh（默认）| en；留空沿用服务端 QUANT_ASST_REPORT_LANG 配置",
+    )
+
+    @field_validator("report_language")
+    @classmethod
+    def _check_report_language(cls, v: str) -> str:
+        """fail-closed：仅接受 zh / en（大小写不敏感）；空串表示不覆盖。"""
+        from core.i18n import normalize_report_language
+
+        key = (v or "").strip().lower()
+        if not key:
+            return ""
+        return normalize_report_language(key)
 
     @field_validator("market")
     @classmethod
@@ -177,6 +195,7 @@ class AnalysisRequestEcho(BaseModel):
     debate_rounds: int
     risk_threshold: str
     initial_capital: float
+    report_language: str = ""
 
 
 class AnalysisStatusResponse(BaseModel):

@@ -35,6 +35,7 @@ def build_audit_graph(
     source_run_id: str = "",
     threshold: str = "high",
     recorder: TrajectoryRecorder | None = None,
+    lang: str = "zh",
 ):
     """构建并编译红队审计 + 风控综合图。
 
@@ -44,10 +45,14 @@ def build_audit_graph(
         source_run_id: 被审计的辩论 run_id（写 ``redteam_report.source_run_id``）。
         threshold: 风险门控阈值（默认 high；可收紧为 medium）。
         recorder: 外部传入的轨迹记录器（缺省自建）。
+        lang: 门控结论文案语言（zh 默认 / en），只影响文案不影响判定。
 
     Returns:
         (compiled_graph, recorder)。
     """
+    from core.i18n import normalize_report_language
+
+    lang = normalize_report_language(lang)
     recorder = recorder or TrajectoryRecorder(run_id, settings.trajectory_dir)
 
     redteam = RedTeamAgent(settings, recorder)
@@ -74,7 +79,7 @@ def build_audit_graph(
     def gate_node(state: QuantAsstState) -> dict[str, Any]:
         if state.get("error"):
             return {}
-        gate = apply_risk_gate(state.get("redteam_report") or {}, threshold)
+        gate = apply_risk_gate(state.get("redteam_report") or {}, threshold, lang)
         recorder.log(node="gate", event="gate",
                      payload={"risk_level": gate.risk_level,
                               "trade_suggestion_allowed": gate.trade_suggestion_allowed,
@@ -99,7 +104,9 @@ def build_audit_graph(
         # blocked 一致性：凡 final_decision == blocked（无论 critical 还是
         # tradability=prohibited），trade_advisory 必须清空并写入拦截说明文案，
         # 不能出现「决策已拦截、建议文本仍在输出」的不一致。
-        trade_advisory = advisory_for_decision(decision, draft.get("trade_advisory", ""))
+        trade_advisory = advisory_for_decision(
+            decision, draft.get("trade_advisory", ""), lang
+        )
 
         final = FinalAnalysisReport(
             symbol=draft.get("symbol") or state.get("symbol") or "",

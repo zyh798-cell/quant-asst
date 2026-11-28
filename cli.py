@@ -112,12 +112,15 @@ def debate(
     rounds: int = typer.Option(3, "--rounds", min=1, max=3, help="最大辩论轮次（1~3）"),
     no_mock: bool = typer.Option(False, "--no-mock", help="强制调用真实 LLM（缺省：无密钥时自动使用 mock 离线模式）"),
     html: bool = typer.Option(False, "--html", help="额外生成 Plotly 交互式 HTML 最终报告（默认只输出 md）"),
+    report_lang: str = typer.Option("", "--report-lang", help="报告语言：zh（默认）| en"),
 ) -> None:
     """多智能体多空辩论：输入策略描述，输出逐轮辩论 + 风控核验 + 裁决结论与修订建议（Step 4）。"""
     import json as _json
 
     from core.config import get_settings
+    from core.i18n import normalize_report_language
 
+    lang = normalize_report_language(report_lang or None)
     settings = get_settings()
     if not no_mock and not os.getenv("QUANT_ASST_LLM_MOCK"):
         # 无显式指定且未检测到密钥时自动启用离线 mock，保证 CI/无网可用
@@ -180,7 +183,7 @@ def debate(
     # ---- Markdown 报告落盘 ./output/debate_reports/ ----
     from report.markdown import write_debate_report
 
-    md_path = write_debate_report(outcome, settings.output_dir)
+    md_path = write_debate_report(outcome, settings.output_dir, lang)
     json_path = settings.output_dir / "debate_reports" / f"{run_id}.json"
     json_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(_json.dumps(outcome, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -214,6 +217,7 @@ def debate(
                 symbol=resolved_symbol or outcome.get("symbol", ""),
                 timestamp=datetime.now().strftime("%Y%m%d_%H%M%S"),
                 revised_strategy_text=outcome.get("revised_strategy_text", ""),
+                lang=lang,
             )
         console.print(f"[dim]HTML 报告：{html_path}[/dim]")
 
@@ -227,6 +231,7 @@ def audit(
     no_mock: bool = typer.Option(False, "--no-mock",
                                  help="强制真实 LLM（缺省：未检测到 DEEPSEEK_API_KEY 时自动 mock）"),
     html: bool = typer.Option(False, "--html", help="额外生成 Plotly 交互式 HTML 最终报告（默认只输出 md）"),
+    report_lang: str = typer.Option("", "--report-lang", help="报告语言：zh（默认）| en"),
 ) -> None:
     """对已有辩论报告执行红队审计 + 风控综合，产出审计报告与最终量化分析报告（Step 5）。
 
@@ -239,9 +244,11 @@ def audit(
 
     from core.audit_graph import build_audit_graph
     from core.config import get_settings
+    from core.i18n import normalize_report_language
     from core.trajectory import TrajectoryRecorder
     from report.markdown import write_audit_report, write_final_report
 
+    lang = normalize_report_language(report_lang or None)
     settings = get_settings()
     if not no_mock and not os.getenv("QUANT_ASST_LLM_MOCK"):
         if not secret_exists("DEEPSEEK_API_KEY"):
@@ -260,7 +267,7 @@ def audit(
 
     recorder = TrajectoryRecorder(audit_run_id, settings.trajectory_dir)
     graph, _ = build_audit_graph(settings, run_id=audit_run_id, source_run_id=source_run_id,
-                                 threshold=threshold, recorder=recorder)
+                                 threshold=threshold, recorder=recorder, lang=lang)
     try:
         final_state = graph.invoke({
             "run_id": audit_run_id,
@@ -281,8 +288,9 @@ def audit(
     audit_report = final_state.get("redteam_report") or {}
     final_report = final_state.get("final_report") or {}
 
-    audit_md = write_audit_report(audit_report, settings.audit_dir, symbol, timestamp, source_outcome=outcome)
-    final_md = write_final_report(final_report, settings.audit_dir, symbol, timestamp)
+    audit_md = write_audit_report(audit_report, settings.audit_dir, symbol, timestamp,
+                                  source_outcome=outcome, lang=lang)
+    final_md = write_final_report(final_report, settings.audit_dir, symbol, timestamp, lang=lang)
 
     gate = final_report.get("risk_gate") or {}
     console.print(f"\n[bold cyan]审计结果[/bold cyan]：综合风险 {final_report.get('overall_risk_level')}"
@@ -308,6 +316,7 @@ def audit(
                 symbol=symbol,
                 timestamp=timestamp,
                 revised_strategy_text=revised_text,
+                lang=lang,
             )
         console.print(f"[dim]HTML 报告：{html_path}[/dim]")
 
@@ -449,6 +458,7 @@ def optimize(
     capital: float = typer.Option(1_000_000.0, "--capital", help="初始资金"),
     train_ratio: float = typer.Option(None, "--train-ratio", min=0.1, max=0.9,
                                       help="样本内占比（缺省用配置 0.7）"),
+    report_lang: str = typer.Option("", "--report-lang", help="报告语言：zh（默认）| en"),
 ) -> None:
     """参数网格寻优 + 样本外验证（纯确定性网格遍历，不调用 LLM）。"""
     from backtest.optimizer import (
@@ -457,9 +467,11 @@ def optimize(
         optimize_grid,
         parse_param_grid,
     )
+    from core.i18n import normalize_report_language
     from core.markets import Symbol
     from tools.market_data import get_backtest_frame
 
+    lang = normalize_report_language(report_lang or None)
     settings = get_settings()
     if sandbox == "local":
         console.print(LOCAL_SANDBOX_CLI_WARNING)  # 红色警告（CLI 层）
@@ -499,7 +511,7 @@ def optimize(
     from report.markdown import write_optimization_report
 
     with console.status("[3/3] 渲染并落盘寻优报告 ..."):
-        md_path = write_optimization_report(result, settings.output_dir)
+        md_path = write_optimization_report(result, settings.output_dir, lang)
 
     _print_optimization_result(result, md_path)
 

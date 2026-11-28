@@ -11,8 +11,10 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.i18n import normalize_report_language
 from core.markets import Market
 
 
@@ -33,6 +35,19 @@ class Settings(BaseSettings):
 
     # ---- 市场 ----
     default_market: Market = Market.CN_STOCK
+
+    # ---- 报告语言（Step K）：zh（默认，行为不变）| en ----
+    #: 环境变量名按需求固定为 QUANT_ASST_REPORT_LANG（不用通用前缀推导出的 REPORT_LANGUAGE）
+    report_language: str = Field(
+        default="zh",
+        validation_alias="QUANT_ASST_REPORT_LANG",
+    )
+
+    @field_validator("report_language")
+    @classmethod
+    def _check_report_language(cls, v: str) -> str:
+        """fail-closed：非法报告语言直接报错，不静默回落。"""
+        return normalize_report_language(v)
 
     # ---- 回测成本（硬约束 5；各市场完整规则见 backtest/market_rules.py）----
     trade_cost_rate: float = 0.0015  # 双边各 0.15%（含佣金/税费总口径）

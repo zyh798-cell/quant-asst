@@ -88,11 +88,13 @@ def build_html_report(
     symbol: str,
     timestamp: str,
     revised_strategy_text: str = "",
+    lang: str | None = None,
 ) -> str:
     """编排并落盘 HTML 最终报告，返回落盘路径。
 
     优先用 final_report/audit_report/debate_outcome 里的回测摘要；若缺回测明细，
     且调用方提供了修订策略文本，则补跑一次参考回测取数（失败降级）。
+    ``lang`` 为报告语言（zh 默认 / en），透传给渲染层。
 
     参考回测的 trajectory 留痕使用**自建专用 recorder**（追加写，不依赖外部
     recorder 的生命周期——CLI 调用本函数时主 recorder 可能已 close()）。
@@ -121,6 +123,7 @@ def build_html_report(
         audit_report=audit_report,
         debate_outcome=debate_outcome,
         kline_df=kline_df,
+        lang=lang,
     )
     from report.html import write_final_html
 

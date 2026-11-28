@@ -16,6 +16,14 @@ import html
 import json
 from typing import Any
 
+from core.i18n import (
+    format_message,
+    normalize_report_language,
+    risk_label,
+    risk_level_display,
+    t,
+)
+
 #: 克制专业的金融量化调色板（深蓝主系 + 红绿涨跌辅助）
 _COLORS = {
     "nav": "#1f4e79",          # 净值曲线：深蓝
@@ -59,7 +67,7 @@ def _safe_ticker(ticker: str) -> str:
 # 图表构造（Plotly express / graph_objects，离线内联）
 # ---------------------------------------------------------------------------
 
-def _build_candlestick_with_signals(df: Any, trades: list[dict]) -> Any:
+def _build_candlestick_with_signals(df: Any, trades: list[dict], lang: str) -> Any:
     """K线 + 买卖信号标记。买入在低点下方标注，卖出在高点上方标注。"""
     import plotly.graph_objects as go
 
@@ -67,28 +75,32 @@ def _build_candlestick_with_signals(df: Any, trades: list[dict]) -> Any:
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
         x=dates, open=df["open"], high=df["high"], low=df["low"], close=df["close"],
-        name="K线", increasing_line_color=_COLORS["candle_up"],
+        name=t("html.chart.kline", lang), increasing_line_color=_COLORS["candle_up"],
         decreasing_line_color=_COLORS["candle_down"],
     ))
-    buys = [t for t in trades if t.get("side") == "buy"]
-    sells = [t for t in trades if t.get("side") == "sell"]
+    buys = [t_ for t_ in trades if t_.get("side") == "buy"]
+    sells = [t_ for t_ in trades if t_.get("side") == "sell"]
     if buys:
         fig.add_trace(go.Scatter(
-            x=[t["date"] for t in buys], y=[t["price"] for t in buys],
+            x=[x["date"] for x in buys], y=[x["price"] for x in buys],
             mode="markers", marker=dict(symbol="triangle-up", size=10,
                                         color=_COLORS["buy"], line=dict(width=1, color="#145a32")),
-            name="买入信号", hovertext=[f"买入 {t.get('shares', '')}" for t in buys],
+            name=t("html.chart.buy", lang),
+            hovertext=[format_message("html.chart.buy_hover", lang, shares=x.get("shares", ""))
+                      for x in buys],
         ))
     if sells:
         fig.add_trace(go.Scatter(
-            x=[t["date"] for t in sells], y=[t["price"] for t in sells],
+            x=[x["date"] for x in sells], y=[x["price"] for x in sells],
             mode="markers", marker=dict(symbol="triangle-down", size=10,
                                         color=_COLORS["sell"], line=dict(width=1, color="#641e16")),
-            name="卖出信号", hovertext=[f"卖出 {t.get('shares', '')}" for t in sells],
+            name=t("html.chart.sell", lang),
+            hovertext=[format_message("html.chart.sell_hover", lang, shares=x.get("shares", ""))
+                      for x in sells],
         ))
     fig.update_layout(
-        title=dict(text="标的K线行情与策略信号标记", x=0.5, font=dict(size=15)),
-        xaxis_title="日期", yaxis_title="价格",
+        title=dict(text=t("html.chart.candle_title", lang), x=0.5, font=dict(size=15)),
+        xaxis_title=t("html.chart.date", lang), yaxis_title=t("html.chart.price", lang),
         template="plotly_white", height=460, showlegend=True,
         margin=dict(l=50, r=20, t=60, b=40),
         xaxis_rangeslider_visible=False,
@@ -96,7 +108,9 @@ def _build_candlestick_with_signals(df: Any, trades: list[dict]) -> Any:
     return fig
 
 
-def _build_equity_curve(equity: dict, initial_capital: float, out_sample_start: str) -> Any:
+def _build_equity_curve(
+    equity: dict, initial_capital: float, out_sample_start: str, lang: str
+) -> Any:
     """净值曲线 + 初始资金基准线 + 样本外起点标注。"""
     import plotly.graph_objects as go
 
@@ -104,24 +118,26 @@ def _build_equity_curve(equity: dict, initial_capital: float, out_sample_start: 
     nav = equity.get("nav", [])
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=dates, y=nav, mode="lines", name="策略净值",
+        x=dates, y=nav, mode="lines", name=t("html.chart.nav", lang),
         line=dict(color=_COLORS["nav"], width=2),
     ))
     fig.add_trace(go.Scatter(
         x=dates, y=[initial_capital] * len(dates), mode="lines",
-        name="初始资金基准", line=dict(color=_COLORS["benchmark"], width=1, dash="dash"),
+        name=t("html.chart.benchmark", lang),
+        line=dict(color=_COLORS["benchmark"], width=1, dash="dash"),
     ))
     fig.add_vline(x=out_sample_start, line_dash="dot", line_color="#7f8c8d",
-                  annotation_text="样本外起点", annotation_position="top left")
+                  annotation_text=t("html.chart.oos_mark", lang),
+                  annotation_position="top left")
     fig.update_layout(
-        title=dict(text="回测净值曲线", x=0.5, font=dict(size=15)),
-        xaxis_title="日期", yaxis_title="净值",
+        title=dict(text=t("html.chart.equity_title", lang), x=0.5, font=dict(size=15)),
+        xaxis_title=t("html.chart.date", lang), yaxis_title=t("html.chart.nav_axis", lang),
         template="plotly_white", height=380, margin=dict(l=50, r=20, t=60, b=40),
     )
     return fig
 
 
-def _build_drawdown_curve(equity: dict) -> Any:
+def _build_drawdown_curve(equity: dict, lang: str) -> Any:
     """最大回撤曲线（净值相对历史峰值的回撤，负值）。"""
     import plotly.graph_objects as go
 
@@ -134,12 +150,12 @@ def _build_drawdown_curve(equity: dict) -> Any:
         dd.append((v / peak - 1.0) if peak else 0.0)
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=dates, y=dd, mode="lines", name="回撤", fill="tozeroy",
+        x=dates, y=dd, mode="lines", name=t("html.chart.dd", lang), fill="tozeroy",
         line=dict(color=_COLORS["drawdown"], width=1.5),
     ))
     fig.update_layout(
-        title=dict(text="最大回撤曲线", x=0.5, font=dict(size=15)),
-        xaxis_title="日期", yaxis_title="回撤",
+        title=dict(text=t("html.chart.dd_title", lang), x=0.5, font=dict(size=15)),
+        xaxis_title=t("html.chart.date", lang), yaxis_title=t("html.chart.dd_axis", lang),
         template="plotly_white", height=300, margin=dict(l=50, r=20, t=60, b=40),
     )
     return fig
@@ -149,29 +165,32 @@ def _build_drawdown_curve(equity: dict) -> Any:
 # HTML 组装
 # ---------------------------------------------------------------------------
 
-def _metrics_table(backtest: dict) -> str:
+def _metrics_table(backtest: dict, lang: str) -> str:
     """风险指标汇总面板：夏普/最大回撤/胜率/盈亏比等。"""
     ov = backtest.get("overall", {})
     rows = [
-        ("区间总收益", _pct(ov.get("total_return"))),
-        ("年化收益", _pct(ov.get("annual_return"))),
-        ("最大回撤", _pct(ov.get("max_drawdown"))),
-        ("夏普比率", _fmt(ov.get("sharpe"))),
-        ("按笔胜率", _fmt(ov.get("win_rate")) if ov.get("win_rate") is not None else "N/A"),
-        ("成交笔数", str(ov.get("n_trades", 0))),
-        ("初始资金", _fmt(backtest.get("initial_capital"))),
-        ("期末净值", _fmt(backtest.get("final_equity"))),
-        ("累计成本", _fmt(backtest.get("total_cost"))),
-        ("样本外起点", str(backtest.get("out_sample_start", "N/A"))),
+        (t("html.metric.total_return", lang), _pct(ov.get("total_return"))),
+        (t("html.metric.annual_return", lang), _pct(ov.get("annual_return"))),
+        (t("html.metric.max_drawdown", lang), _pct(ov.get("max_drawdown"))),
+        (t("html.metric.sharpe", lang), _fmt(ov.get("sharpe"))),
+        (t("html.metric.win_rate", lang),
+         _fmt(ov.get("win_rate")) if ov.get("win_rate") is not None else t("common.na", lang)),
+        (t("html.metric.n_trades", lang), str(ov.get("n_trades", 0))),
+        (t("html.metric.initial_capital", lang), _fmt(backtest.get("initial_capital"))),
+        (t("html.metric.final_equity", lang), _fmt(backtest.get("final_equity"))),
+        (t("html.metric.total_cost", lang), _fmt(backtest.get("total_cost"))),
+        (t("html.metric.out_sample_start", lang), str(backtest.get("out_sample_start", "N/A"))),
     ]
     trs = "\n".join(f"<tr><td>{k}</td><td>{html.escape(str(v))}</td></tr>" for k, v in rows)
     return (
-        '<table class="metrics"><thead><tr><th>指标</th><th>数值</th></tr></thead>'
+        '<table class="metrics"><thead><tr>'
+        f'<th>{t("html.metrics_col.name", lang)}</th>'
+        f'<th>{t("html.metrics_col.value", lang)}</th></tr></thead>'
         f"<tbody>{trs}</tbody></table>"
     )
 
 
-def _list_section(title: str, items: list[str] | None, empty_text: str = "（无）") -> str:
+def _list_section(title: str, items: list[str] | None, empty_text: str) -> str:
     lis = "".join(f"<li>{_esc(x)}</li>" for x in (items or []))
     return f'<h3>{_esc(title)}</h3><ul>{lis or f"<li>{empty_text}</li>"}</ul>'
 
@@ -194,6 +213,7 @@ def render_final_html(
     debate_outcome: dict[str, Any] | None,
     kline_df: Any = None,
     source_note: str = "Quant Asst 多智能体量化研究引擎",
+    lang: str | None = None,
 ) -> str:
     """渲染单文件交互式 HTML 最终报告。
 
@@ -204,8 +224,13 @@ def render_final_html(
         debate_outcome: ``DebateOutcome.model_dump()``（辩论纪要，可选）。
         kline_df: 标的日线 OHLCV DataFrame（用于K线图，可选；缺省跳过K线图）。
         source_note: 数据来源注释。
+        lang: 报告语言（``zh`` 默认 / ``en``）；标题、章节标题、表头、图例、
+            轴标签与免责声明随语言切换，数字与日期格式不变。
     """
     import plotly.io as pio
+
+    lang = normalize_report_language(lang)
+    colon = t("punct.colon", lang)
 
     equity = (backtest or {}).get("equity_curve") or {}
     trades = (backtest or {}).get("trades") or []
@@ -216,13 +241,13 @@ def render_final_html(
     charts: list[str] = []
     if kline_df is not None and not kline_df.empty and trades:
         charts.append(pio.to_json(
-            _build_candlestick_with_signals(kline_df, trades), pretty=True
+            _build_candlestick_with_signals(kline_df, trades, lang), pretty=True
         ))
     if equity.get("dates") and equity.get("nav"):
         charts.append(pio.to_json(
-            _build_equity_curve(equity, initial_capital, out_sample_start), pretty=True
+            _build_equity_curve(equity, initial_capital, out_sample_start, lang), pretty=True
         ))
-        charts.append(pio.to_json(_build_drawdown_curve(equity), pretty=True))
+        charts.append(pio.to_json(_build_drawdown_curve(equity, lang), pretty=True))
 
     # plotly.js 内联 + 图表占位（离线单文件）
     plotly_js = _plotly_js_bundle()
@@ -233,8 +258,6 @@ def render_final_html(
     gate = (final_report or {}).get("risk_gate") or {}
     risk_level = (final_report or {}).get("overall_risk_level") or \
                  (audit_report or {}).get("overall_risk_level", "low")
-    risk_label = {"low": "低", "medium": "中", "high": "高", "critical": "致命"}.get(
-        risk_level, risk_level)
     final_decision = (final_report or {}).get("final_decision", "")
     banner = gate.get("risk_banner", "") or ""
     constraints = gate.get("constraint_boundaries") or []
@@ -244,13 +267,17 @@ def render_final_html(
     constraints_html = ""
     if constraints:
         lis = "".join(f"<li>{_esc(c)}</li>" for c in constraints)
-        constraints_html = f'<div class="constraints"><h3>约束边界（强制）</h3><ul>{lis}</ul></div>'
+        constraints_html = (
+            f'<div class="constraints"><h3>{t("html.constraints_title", lang)}</h3>'
+            f"<ul>{lis}</ul></div>"
+        )
 
     # ---- 决策与风险定级摘要条 ----
     decision_html = (
         '<div class="decision-bar">'
-        f'<span>最终决策：<b>{_esc(final_decision or "N/A")}</b></span>'
-        f'<span>综合风险定级：<b>{_esc(risk_label)}（{_esc(str(risk_level))}）</b></span>'
+        f'<span>{t("html.decision_label", lang)}{colon}<b>{_esc(final_decision or "N/A")}</b></span>'
+        f'<span>{t("html.risk_label", lang)}{colon}'
+        f'<b>{_esc(risk_level_display(risk_level, lang))}</b></span>'
         '</div>'
         if (final_decision or risk_level) else ""
     )
@@ -259,36 +286,46 @@ def render_final_html(
     debate_summary = ""
     if debate_outcome:
         verdict = debate_outcome.get("verdict") or {}
+        consensus_text = "；".join(verdict.get("consensus") or []) \
+            or t("common.none_paren", lang)
         debate_summary = (
-            f"辩论轮次 {debate_outcome.get('rounds', 0)} | "
-            f"裁决 {verdict.get('decision', 'N/A')} | "
-            f"可信度 {verdict.get('credibility_score', 'N/A')}/100。"
-            f"共识：{'；'.join(verdict.get('consensus') or []) or '（无）'}。"
+            f"{t('debate.meta.rounds', lang)} {debate_outcome.get('rounds', 0)} | "
+            f"{t('html.summary.verdict', lang)} {verdict.get('decision', 'N/A')} | "
+            f"{t('debate.credibility_label', lang)} "
+            f"{verdict.get('credibility_score', 'N/A')}/100。"
+            f"{t('html.summary.consensus_prefix', lang)}{consensus_text}。"
         )
-    audit_summary = (audit_report or {}).get("summary", "") or "（未执行红队审计）"
-    officer_summary = (final_report or {}).get("executive_summary", "") or "（无最终分析）"
+    audit_summary = (audit_report or {}).get("summary", "") or t("html.empty.audit", lang)
+    officer_summary = (final_report or {}).get("executive_summary", "") \
+        or t("html.empty.officer", lang)
     trade_advisory = (final_report or {}).get("trade_advisory", "")
 
-    metrics_panel = _metrics_table(backtest) if backtest else "<p>（无回测数据）</p>"
+    metrics_panel = _metrics_table(backtest, lang) if backtest \
+        else f"<p>{t('html.empty.backtest', lang)}</p>"
     text_panel = _text_panel([
-        ("辩论摘要", debate_summary or "（无辩论纪要）"),
-        ("红队审计风险结论", audit_summary),
-        ("风控综合结论", officer_summary),
+        (t("html.panel.debate", lang), debate_summary or t("html.empty.debate", lang)),
+        (t("html.panel.audit", lang), audit_summary),
+        (t("html.panel.officer", lang), officer_summary),
     ])
     advisory_html = (
-        f'<div class="panel advisory"><h3>交易建议</h3><p>{_esc(trade_advisory)}</p></div>'
+        f'<div class="panel advisory"><h3>{t("html.panel.advisory", lang)}</h3>'
+        f'<p>{_esc(trade_advisory)}</p></div>'
         if trade_advisory else
-        '<div class="panel advisory"><h3>交易建议</h3><p>（致命风险已拦截交易建议生成，或未给出可执行建议。）</p></div>'
+        '<div class="panel advisory">'
+        f'<h3>{t("html.panel.advisory", lang)}</h3>'
+        f'<p>{t("html.empty.advisory", lang)}</p></div>'
     )
 
-    chart_slots = "\n".join(f'<div class="chart" id="chart-{i}"></div>' for i in range(len(charts)))
+    chart_slots = "\n".join(
+        f'<div class="chart" id="chart-{i}"></div>' for i in range(len(charts))
+    )
 
     return f"""<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{t('html.lang_attr', lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quant Asst 最终量化分析报告：{_esc(str(symbol))}</title>
+<title>{_esc(format_message('html.title', lang, symbol=str(symbol)))}</title>
 <script>{plotly_js}</script>
 <style>
   :root {{ --nav:{_COLORS['nav']}; --dd:{_COLORS['drawdown']}; --text:{_COLORS['text']};
@@ -319,22 +356,20 @@ def render_final_html(
 </style>
 </head>
 <body>
-<h1>最终量化分析报告：{_esc(str(symbol))}</h1>
-<div class="meta">数据源：{_esc(source_note)} | 回测约束边界见文末注释 | 仅用于研究与教育，不构成投资建议</div>
+<h1>{_esc(format_message('html.title', lang, symbol=str(symbol)))}</h1>
+<div class="meta">{format_message('html.meta', lang, note=_esc(source_note))}</div>
 {decision_html}
 {risk_banner_html}
 {constraints_html}
-<h2>风险指标汇总</h2>
+<h2>{t('html.metrics_title', lang)}</h2>
 {metrics_panel}
-<h2>图表</h2>
-{chart_slots if chart_slots else '<p>（无可视化数据：缺净值曲线或K线明细）</p>'}
-<h2>分析摘要</h2>
+<h2>{t('html.charts_title', lang)}</h2>
+{chart_slots if chart_slots else f"<p>{t('html.empty.charts', lang)}</p>"}
+<h2>{t('html.summary_title', lang)}</h2>
 {text_panel}
 {advisory_html}
 <div class="footer">
-数据来源：{_esc(source_note)}（AkShare/DuckDB 本地缓存 + 事件驱动回测引擎）。
-回测约束边界：样本内/外按 70/30 切分；成交按次开盘价撮合并含双边成本与滑点；
-本报告为历史回测研究产物，不预示未来收益，禁止直接用于实盘下单。
+{format_message('html.footer', lang, note=_esc(source_note))}
 </div>
 <script>
 var CHARTS = {json.dumps(charts, ensure_ascii=False)};

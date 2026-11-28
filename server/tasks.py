@@ -29,6 +29,7 @@ from agents.final_risk_officer import FinalRiskOfficerAgent
 from agents.hypothesis import HypothesisAgent
 from agents.redteam import RedTeamAgent
 from core.config import Settings, get_settings
+from core.i18n import normalize_report_language
 from core.llm import is_mock_mode
 from core.markets import Symbol
 from core.risk_gate import apply_risk_gate, final_decision
@@ -72,6 +73,11 @@ _SECRET_PATTERN = re.compile(
     r"(sk-[A-Za-z0-9_\-]{8,}|(?:api[_-]?key|secret|token)\s*[:=]\s*[^\s,;\"']{6,})",
     re.IGNORECASE,
 )
+
+
+def resolve_task_language(request: AnalysisCreateRequest, settings: Settings) -> str:
+    """任务报告语言：请求显式指定优先，否则回落进程配置（默认 zh）。"""
+    return normalize_report_language(request.report_language or settings.report_language)
 
 
 def redact_secrets(text: str | None) -> str | None:
@@ -125,6 +131,7 @@ class TaskManager:
             debate_rounds=request.debate_rounds,
             risk_threshold=request.risk_threshold,
             initial_capital=request.initial_capital,
+            report_language=request.report_language,
         )
         with self._lock:
             self._tasks[task_id] = {
@@ -437,8 +444,9 @@ class TaskManager:
         self._begin_stage(task_id, "risk")
         report: dict[str, Any] = ctx["audit"]
         outcome: dict[str, Any] = ctx["debate"]
+        task_lang = resolve_task_language(request, self._settings)
 
-        gate = apply_risk_gate(report, request.risk_threshold)
+        gate = apply_risk_gate(report, request.risk_threshold, task_lang)
         officer = FinalRiskOfficerAgent(self._settings, recorder)
         result = officer.run(
             {
@@ -501,6 +509,7 @@ class TaskManager:
     ) -> None:
         self._begin_stage(task_id, "report")
         symbol: Symbol = ctx["symbol"]
+        task_lang = resolve_task_language(request, self._settings)
         out_dir = self._settings.report_dir / recorder.run_id
         out_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -508,11 +517,11 @@ class TaskManager:
 
         md_text = "\n\n".join(
             [
-                render_debate_markdown(ctx["debate"]),
+                render_debate_markdown(ctx["debate"], task_lang),
                 "---\n",
-                render_audit_markdown(ctx["audit"], ctx["debate"]),
+                render_audit_markdown(ctx["audit"], ctx["debate"], task_lang),
                 "---\n",
-                render_final_markdown(ctx["final"]),
+                render_final_markdown(ctx["final"], task_lang),
             ]
         )
         md_path = out_dir / f"report_{safe}_{timestamp}.md"
@@ -548,6 +557,7 @@ class TaskManager:
                 audit_report=ctx["audit"],
                 debate_outcome=ctx["debate"],
                 kline_df=None,
+                lang=task_lang,
             )
             html_path = out_dir / f"report_{safe}_{timestamp}.html"
             html_path.write_text(html_text, encoding="utf-8")

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 
+from core.i18n import format_message, normalize_report_language
 from core.schemas import RISK_RANK, RiskGate, normalize_risk_level
 
 logger = logging.getLogger("quant_asst.risk")
@@ -41,42 +42,42 @@ BLOCKED_ADVISORY_TEXT = (
 )
 
 
-def _constraints_for(level: str) -> list[str]:
+def _constraints_for(level: str, lang: str = "zh") -> list[str]:
     """按风险级别给出强制约束边界清单（高风险及以上适用）。"""
     base = [
-        "本报告仅为研究与教育用途，不构成投资建议，禁止直接用于实盘下单",
-        "策略信号须经样本外与滚动窗口复验后方可评估落地",
-        "仓位与止损须按标的流动性单独核定，不得套用默认满仓假设",
+        format_message(f"gate.constraint.base.{i}", lang) for i in range(3)
     ]
     if level == "critical":
-        base.insert(0, "存在致命缺陷：在缺陷修复并重新审计前，禁止生成交易建议")
+        base.insert(0, format_message("gate.constraint.critical", lang))
     return base
 
 
-def _banner_for(level: str) -> str:
+def _banner_for(level: str, lang: str = "zh") -> str:
     """报告顶部的显著风险提示文本（致命/高风险及以上非空）。"""
     if level == "critical":
-        return (
-            "风险提示：本策略经红队审计判定为致命风险，已拦截交易建议生成。"
-            "在缺陷修复并重新通过审计前，请勿将本报告用于任何实盘决策。"
-        )
+        return format_message("gate.banner.critical", lang)
     if level == "high":
-        return "风险提示：本策略存在高风险，须严格遵守下列约束边界后方可评估使用。"
+        return format_message("gate.banner.high", lang)
     return ""
 
 
 def apply_risk_gate(
-    audit_report: dict, threshold: str = DEFAULT_RISK_THRESHOLD
+    audit_report: dict,
+    threshold: str = DEFAULT_RISK_THRESHOLD,
+    lang: str = "zh",
 ) -> RiskGate:
     """把红队审计结果套上门控规则，产出 :class:`RiskGate`。
 
     Args:
         audit_report: ``AuditReport.model_dump()`` 字典（须含 overall_risk_level）。
         threshold: 触发风险提示/约束边界的最低风险级别（默认 high，可收紧为 medium）。
+        lang: 结论文案语言（zh 默认 / en）；只影响 banner 与约束边界文案，
+             **不改变任何判定结果**（放行/拦截、级别归一化均与语言无关）。
 
     Returns:
         确定性门控结论（不由 LLM 决定，保证可复现）。
     """
+    lang = normalize_report_language(lang)
     level = normalize_risk_level(audit_report.get("overall_risk_level"))
     threshold_rank = RISK_RANK.get(
         normalize_risk_level(threshold), RISK_RANK[DEFAULT_RISK_THRESHOLD]
@@ -88,11 +89,11 @@ def apply_risk_gate(
     constraints: list[str] = []
 
     if level == "critical":
-        banner = _banner_for("critical")
-        constraints = _constraints_for("critical")
+        banner = _banner_for("critical", lang)
+        constraints = _constraints_for("critical", lang)
     elif rank >= threshold_rank:
-        banner = _banner_for("high")
-        constraints = _constraints_for(level)
+        banner = _banner_for("high", lang)
+        constraints = _constraints_for(level, lang)
 
     return RiskGate(
         risk_level=level,
@@ -120,18 +121,21 @@ def final_decision(audit_report: dict, debate_verdict: dict | None = None) -> st
     return "revise"
 
 
-def advisory_for_decision(decision: str, draft_advisory: str = "") -> str:
+def advisory_for_decision(
+    decision: str, draft_advisory: str = "", lang: str = "zh"
+) -> str:
     """按最终决策产出交易建议文本，保证 blocked 与建议内容一致。
 
-    - ``blocked``：一律返回 :data:`BLOCKED_ADVISORY_TEXT`（拦截说明），
+    - ``blocked``：一律返回拦截说明文案（语言随 ``lang``），
       无论该 blocked 来自 critical 还是 ``tradability == "prohibited"``；
     - 其他决策：保留 LLM 草稿建议（缺省空串）。
 
     Args:
         decision: ``final_decision`` 的结果。
         draft_advisory: LLM 草稿中的交易建议原文。
+        lang: 拦截说明文案语言（zh 默认 / en）。
     """
     if decision == "blocked":
         logger.warning("最终决策 blocked：交易建议已清空并写入拦截说明")
-        return BLOCKED_ADVISORY_TEXT
+        return format_message("gate.blocked_advisory", normalize_report_language(lang))
     return draft_advisory or ""

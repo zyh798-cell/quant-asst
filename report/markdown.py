@@ -1,12 +1,23 @@
-"""Markdown 报告渲染（Step 4 辩论纪要）。
+"""Markdown 报告渲染（Step 4 辩论纪要；Step 5 审计/最终报告；Step J 寻优；Step K 双语）。
 
 风格约定（面向 GitHub Demo）：专业工程文档风格 —— **不使用任何 emoji 或装饰符号**，
 标题层级规范、表格与代码块简洁、语言严谨客观。
+
+双语（Step K）：所有静态文案取自 :mod:`core.i18n` 集中式目录，渲染代码不内联硬编码
+文案；``lang`` 缺省为 ``zh``，默认行为与历史产物逐字一致。数字与日期格式不随语言变化。
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from core.i18n import (
+    format_message,
+    normalize_report_language,
+    risk_label,
+    risk_level_display,
+    t,
+)
 
 
 def _pct(v: float | None) -> str:
@@ -23,140 +34,163 @@ def _signed_pct(v: float | None) -> str:
     return f"{v * 100:+.1f}%"
 
 
-def _fmt_points(points: list[dict]) -> list[str]:
+def _fmt_points(points: list[dict], lang: str) -> list[str]:
     out = []
     for i, p in enumerate(points or []):
         ev = (p.get("evidence") or "").replace("\n", " ")
-        out.append(f"{i + 1}. **{p.get('claim', '')}** — 证据类型 `{p.get('evidence_type', '')}`：{ev}")
-    return out or ["（无）"]
+        out.append(format_message(
+            "debate.point_line", lang,
+            i=i + 1,
+            claim=p.get("claim", ""),
+            evidence_type=p.get("evidence_type", ""),
+            evidence=ev,
+        ))
+    return out or [t("common.none_paren", lang)]
 
 
-def render_debate_markdown(outcome: dict[str, Any]) -> str:
+def render_debate_markdown(outcome: dict[str, Any], lang: str | None = None) -> str:
     """把 DebateOutcome 渲染为 Markdown 辩论报告。
 
     Args:
         outcome: ``DebateOutcome.model_dump()`` 字典。
+        lang: 报告语言（``zh`` 默认 / ``en``）；见 :mod:`core.i18n`。
 
     Returns:
         Markdown 文本（UTF-8）。
     """
+    lang = normalize_report_language(lang)
+    colon = t("punct.colon", lang)
     meta_lines = [
-        f"# 多空辩论报告：{outcome.get('symbol', '')}",
+        format_message("debate.title", lang, symbol=outcome.get('symbol', '')),
         "",
-        "| 项目 | 内容 |",
+        f"| {t('common.item', lang)} | {t('common.value', lang)} |",
         "| --- | --- |",
-        f"| 标的 | `{outcome.get('symbol', '')}` |",
-        f"| 市场 | {outcome.get('market', '')} |",
-        f"| 策略描述 | {outcome.get('user_input', '')} |",
-        f"| 辩论轮次 | {outcome.get('rounds', 0)} |",
-        f"| run_id | `{outcome.get('run_id', '')}` |",
+        f"| {t('debate.meta.symbol', lang)} | `{outcome.get('symbol', '')}` |",
+        f"| {t('debate.meta.market', lang)} | {outcome.get('market', '')} |",
+        f"| {t('debate.meta.strategy_desc', lang)} | {outcome.get('user_input', '')} |",
+        f"| {t('debate.meta.rounds', lang)} | {outcome.get('rounds', 0)} |",
+        f"| {t('debate.meta.run_id', lang)} | `{outcome.get('run_id', '')}` |",
         "",
-        "本报告由 Quant Asst 多智能体辩论流程自动生成，仅用于研究与教育，不构成投资建议。",
+        t("debate.disclaimer", lang),
         "",
     ]
 
-    sections: list[str] = ["\n".join(meta_lines), "\n## 逐轮辩论原文\n"]
+    sections: list[str] = ["\n".join(meta_lines), f"\n{t('debate.transcripts_title', lang)}\n"]
 
     transcripts = outcome.get("round_transcripts") or []
     if not transcripts:
-        sections.append("（无逐轮记录）\n")
-    for t in transcripts:
-        round_no = t.get("round", 0)
-        bull = t.get("bull") or {}
-        bear = t.get("bear") or {}
-        risk = t.get("risk_check") or {}
+        sections.append(f"{t('debate.no_transcripts', lang)}\n")
+    for tr in transcripts:
+        round_no = tr.get("round", 0)
+        bull = tr.get("bull") or {}
+        bear = tr.get("bear") or {}
+        risk = tr.get("risk_check") or {}
 
-        sections.append(f"### 第 {round_no} 轮\n")
-        sections.append("**多头观点**\n")
+        sections.append(format_message("debate.round_heading", lang, round_no=round_no) + "\n")
+        sections.append(f"{t('debate.bull_stance', lang)}\n")
         sections.append(f"> {bull.get('stance', '')}\n")
-        sections.extend(_fmt_points(bull.get("points") or []))
+        sections.extend(_fmt_points(bull.get("points") or [], lang))
         if bull.get("assumptions"):
             sections.append("")
-            sections.append("假设前提：" + "；".join(bull["assumptions"]))
+            sections.append(t("debate.assumptions_prefix", lang) + "；".join(bull["assumptions"]))
         sections.append("")
 
-        sections.append("**空头观点**\n")
+        sections.append(f"{t('debate.bear_stance', lang)}\n")
         sections.append(f"> {bear.get('stance', '')}\n")
-        sections.extend(_fmt_points(bear.get("points") or []))
+        sections.extend(_fmt_points(bear.get("points") or [], lang))
         if bear.get("failure_scenarios"):
             sections.append("")
-            sections.append("失效场景：" + "；".join(bear["failure_scenarios"]))
+            sections.append(
+                t("debate.failure_scenarios_prefix", lang) + "；".join(bear["failure_scenarios"])
+            )
         sections.append("")
 
-        sections.append("**风控核验意见**\n")
-        sections.append(f"- 数据有效性：{risk.get('data_validity', '')}")
+        sections.append(f"{t('debate.risk_check_title', lang)}\n")
+        sections.append(f"- {t('debate.data_validity_label', lang)}{colon}{risk.get('data_validity', '')}")
         findings = risk.get("findings") or []
         if findings:
-            sections.append("- 核验发现：")
+            sections.append(f"- {t('debate.findings_label', lang)}{colon}")
             for f in findings:
-                sections.append(
-                    f"  - [{f.get('severity', '')}] {f.get('target_side', '')}："
-                    f"{f.get('issue', '')}（可证伪={f.get('falsifiable', '')}）"
-                )
+                sections.append(format_message(
+                    "debate.finding_line", lang,
+                    severity=f.get("severity", ""),
+                    target_side=f.get("target_side", ""),
+                    issue=f.get("issue", ""),
+                    falsifiable=f.get("falsifiable", ""),
+                ))
+        sections.append(format_message(
+            "debate.kept_points_line", lang,
+            bull=risk.get("kept_bull_points", []),
+            bear=risk.get("kept_bear_points", []),
+        ))
         sections.append(
-            f"- 留存多头论点索引：{risk.get('kept_bull_points', [])}；"
-            f"留存空头论点索引：{risk.get('kept_bear_points', [])}"
+            f"- {t('debate.recommendation_label', lang)}{colon}"
+            f"{risk.get('recommendation', '')}\n"
         )
-        sections.append(f"- 独立建议：{risk.get('recommendation', '')}\n")
 
     verdict = outcome.get("verdict") or {}
-    sections.append("## 裁决结论\n")
-    sections.append("| 项目 | 内容 |")
+    sections.append(f"{t('debate.verdict_title', lang)}\n")
+    sections.append(f"| {t('common.item', lang)} | {t('common.value', lang)} |")
     sections.append("| --- | --- |")
-    sections.append(f"| 可信度打分 | {verdict.get('credibility_score', 'N/A')} / 100 |")
-    sections.append(f"| 最终结论 | {verdict.get('decision', '')} |")
+    sections.append(
+        f"| {t('debate.credibility_label', lang)} | "
+        f"{verdict.get('credibility_score', t('common.na', lang))} / 100 |"
+    )
+    sections.append(f"| {t('debate.decision_label', lang)} | {verdict.get('decision', '')} |")
     sections.append("")
-    sections.append(f"**裁决理由**：{verdict.get('rationale', '')}\n")
+    sections.append(f"{t('debate.rationale_label', lang)}{verdict.get('rationale', '')}\n")
 
     consensus = verdict.get("consensus") or []
     disagreements = verdict.get("disagreements") or []
-    sections.append("**共识**\n")
-    sections.extend(f"- {c}" for c in consensus or ["（无）"])
+    sections.append(f"{t('debate.consensus_label', lang)}\n")
+    sections.extend(f"- {c}" for c in consensus or [t("common.none_paren", lang)])
     sections.append("")
-    sections.append("**分歧**\n")
-    sections.extend(f"- {d}" for d in disagreements or ["（无）"])
+    sections.append(f"{t('debate.disagreements_label', lang)}\n")
+    sections.extend(f"- {d}" for d in disagreements or [t("common.none_paren", lang)])
     sections.append("")
 
     revision = verdict.get("revision") or {}
-    sections.append("## 策略修订建议\n")
+    sections.append(f"{t('debate.revision_title', lang)}\n")
     if revision:
-        sections.append(f"**修订后策略**：{revision.get('revised_strategy_text', '')}\n")
-        sections.append(f"- 开仓规则：{revision.get('entry_rule', '')}")
-        sections.append(f"- 平仓规则：{revision.get('exit_rule', '')}")
+        sections.append(
+            f"{t('debate.revised_strategy_label', lang)}{revision.get('revised_strategy_text', '')}\n"
+        )
+        sections.append(f"- {t('debate.entry_rule_label', lang)}{colon}{revision.get('entry_rule', '')}")
+        sections.append(f"- {t('debate.exit_rule_label', lang)}{colon}{revision.get('exit_rule', '')}")
         params = revision.get("params") or {}
         if params:
             param_str = "、".join(f"{k}={v}" for k, v in params.items())
-            sections.append(f"- 参数：{param_str}")
-        sections.append(f"- 预期效果：{revision.get('expected_effect', '')}\n")
-        sections.append("该修订文本可直接作为 `cli.py run` 的输入执行回测验证：")
+            sections.append(f"- {t('debate.params_label', lang)}{colon}{param_str}")
+        sections.append(
+            f"- {t('debate.expected_effect_label', lang)}{colon}"
+            f"{revision.get('expected_effect', '')}\n"
+        )
+        sections.append(t("debate.usage_hint", lang))
         sections.append("")
         sections.append("```bash")
         sections.append(f'uv run python cli.py run "{revision.get("revised_strategy_text", "")}"')
         sections.append("```")
     else:
-        sections.append("裁决未给出修订建议（decision 非 revise，或 adopt/reject 情形）。")
+        sections.append(t("debate.no_revision", lang))
 
     sections.append("")
     return "\n".join(sections)
 
 
-def write_debate_report(outcome: dict[str, Any], out_dir) -> str:
+def write_debate_report(outcome: dict[str, Any], out_dir, lang: str | None = None) -> str:
     """渲染并落盘辩论 Markdown 报告到 ``<out_dir>/debate_reports/<run_id>.md``。"""
     from pathlib import Path
 
     target = Path(out_dir) / "debate_reports"
     target.mkdir(parents=True, exist_ok=True)
     path = target / f"{outcome.get('run_id', 'debate')}.md"
-    path.write_text(render_debate_markdown(outcome), encoding="utf-8")
+    path.write_text(render_debate_markdown(outcome, lang), encoding="utf-8")
     return str(path)
 
 
 # ---------------------------------------------------------------------------
 # 红队审计报告 + 最终量化分析报告（Step 5）
 # ---------------------------------------------------------------------------
-
-#: 风险级别中文标签（与 core.schemas.RISK_LABELS_ZH 保持一致，避免循环导入在此本地定义）
-_AUDIT_RISK_LABELS = {"low": "低", "medium": "中", "high": "高", "critical": "致命"}
 
 #: 风险级别排序（用于在 findings 中按严重级别降序展示）
 _AUDIT_RISK_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
@@ -177,74 +211,78 @@ def _sort_findings(findings: list[dict]) -> list[dict]:
 
 
 def render_audit_markdown(
-    audit_report: dict[str, Any], source_outcome: dict[str, Any] | None = None
+    audit_report: dict[str, Any],
+    source_outcome: dict[str, Any] | None = None,
+    lang: str | None = None,
 ) -> str:
     """把 AuditReport 渲染为红队审计意见书（Markdown，无 emoji 工程文档风）。
 
     Args:
         audit_report: ``AuditReport.model_dump()`` 字典。
         source_outcome: 被审计的 ``DebateOutcome`` dump（可选，用于展示审计来源）。
+        lang: 报告语言（``zh`` 默认 / ``en``）。
     """
+    lang = normalize_report_language(lang)
+    colon = t("punct.colon", lang)
     level = audit_report.get("overall_risk_level", "low")
-    label = _AUDIT_RISK_LABELS.get(level, level)
+    label = risk_label(level, lang)
     banner = (
-        f"> **风险提示：本策略综合风险定级为「{label}」。以下审计发现须在后续决策中逐项处置。**"
+        format_message("audit.banner", lang, label=label)
         if level in ("high", "critical") else ""
     )
 
     lines: list[str] = [
-        f"# 红队审计意见书：{audit_report.get('symbol', '')}",
+        format_message("audit.title", lang, symbol=audit_report.get('symbol', '')),
         "",
-        "| 项目 | 内容 |",
+        f"| {t('common.item', lang)} | {t('common.value', lang)} |",
         "| --- | --- |",
-        f"| 标的 | `{audit_report.get('symbol', '')}` |",
-        f"| 市场 | {audit_report.get('market', '')} |",
-        f"| 被审计策略 | {audit_report.get('strategy_name', '')} |",
-        f"| 审计 run_id | `{audit_report.get('audit_run_id', '')}` |",
+        f"| {t('debate.meta.symbol', lang)} | `{audit_report.get('symbol', '')}` |",
+        f"| {t('debate.meta.market', lang)} | {audit_report.get('market', '')} |",
+        f"| {t('audit.meta.strategy', lang)} | {audit_report.get('strategy_name', '')} |",
+        f"| {t('audit.meta.audit_run_id', lang)} | `{audit_report.get('audit_run_id', '')}` |",
     ]
     src = (source_outcome or {}).get("run_id") or audit_report.get("source_run_id")
     if src:
-        lines.append(f"| 辩论来源 run_id | `{src}` |")
+        lines.append(f"| {t('audit.meta.source_run_id', lang)} | `{src}` |")
     lines.extend([
-        f"| 综合风险定级 | **{label}（{level}）** |",
-        f"| 交易建议可行性 | {audit_report.get('tradability', '')} |",
+        f"| {t('audit.meta.overall_risk', lang)} | **{risk_level_display(level, lang)}** |",
+        f"| {t('audit.meta.tradability', lang)} | {audit_report.get('tradability', '')} |",
         "",
-        "本意见书由 Quant Asst 红队审计 Agent 独立产出，不参与多空辩论，仅做风险定级；"
-        "仅用于研究与教育，不构成投资建议。",
+        t("audit.disclaimer", lang),
         "",
     ])
     if banner:
         lines.extend([banner, ""])
 
-    lines.append("## 审计结论\n")
+    lines.append(f"{t('audit.conclusion_title', lang)}\n")
     lines.append(f"{audit_report.get('summary', '')}\n")
 
     findings = _sort_findings(audit_report.get("findings") or [])
-    lines.append(f"## 审计发现（{len(findings)} 条）\n")
+    lines.append(format_message("audit.findings_title", lang, n=len(findings)) + "\n")
     if not findings:
-        lines.extend(["未发现需登记的风险条目。", ""])
+        lines.extend([t("audit.no_findings", lang), ""])
     for i, f in enumerate(findings, start=1):
         sev = f.get("severity", "")
-        lines.append(f"### {i}. [{sev.upper()}] {f.get('title', '')}\n")
+        lines.append(format_message(
+            "audit.finding_heading", lang, i=i, sev=sev.upper(), title=f.get("title", "")
+        ) + "\n")
         lines.extend([
-            f"- 风险类别：`{f.get('category', '')}`",
-            f"- 严重级别：{sev}",
-            f"- 问题描述：{f.get('description', '')}",
-            f"- 支撑证据：{f.get('evidence', '')}",
-            f"- 处置建议：{f.get('recommendation', '')}",
+            f"- {t('audit.risk_category', lang)}{colon}`{f.get('category', '')}`",
+            f"- {t('audit.severity', lang)}{colon}{sev}",
+            f"- {t('audit.description', lang)}{colon}{f.get('description', '')}",
+            f"- {t('audit.evidence', lang)}{colon}{f.get('evidence', '')}",
+            f"- {t('audit.recommendation', lang)}{colon}{f.get('recommendation', '')}",
             "",
         ])
 
-    lines.append("## 风险定级说明\n")
-    lines.extend([
-        "| 级别 | 含义 |",
-        "| --- | --- |",
-        "| 低（low） | 常规可控风险，按既定流程处置 |",
-        "| 中（medium） | 存在明确缺陷，须修复后复验 |",
-        "| 高（high） | 关键风险，触发约束边界与报告顶部显著标注 |",
-        "| 致命（critical） | 阻断性缺陷，禁止生成交易建议 |",
-        "",
-    ])
+    lines.append(f"{t('audit.scale_title', lang)}\n")
+    lines.append(
+        f"| {t('audit.scale_col_level', lang)} | {t('audit.scale_col_meaning', lang)} |"
+    )
+    lines.append("| --- | --- |")
+    for code in ("low", "medium", "high", "critical"):
+        lines.append(f"| {risk_level_display(code, lang)} | {t(f'audit.scale.{code}', lang)} |")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -254,6 +292,7 @@ def write_audit_report(
     ticker: str,
     timestamp: str,
     source_outcome: dict[str, Any] | None = None,
+    lang: str | None = None,
 ) -> str:
     """渲染并落盘红队审计意见书到 ``<out_dir>/audit/audit_{ticker}_{timestamp}.md``。
 
@@ -263,6 +302,7 @@ def write_audit_report(
         ticker: 标的统一 symbol（``cn:300750``），落盘时转为文件名安全形式。
         timestamp: 时间戳串（``YYYYMMDD_HHMMSS``）。
         source_outcome: 被审计的辩论纪要（可选）。
+        lang: 报告语言（``zh`` 默认 / ``en``）。
     """
     from pathlib import Path
 
@@ -270,81 +310,91 @@ def write_audit_report(
     target.mkdir(parents=True, exist_ok=True)
     safe_ticker = _sanitize_ticker(ticker or audit_report.get("symbol", "unknown"))
     path = target / f"audit_{safe_ticker}_{timestamp}.md"
-    path.write_text(render_audit_markdown(audit_report, source_outcome), encoding="utf-8")
+    path.write_text(render_audit_markdown(audit_report, source_outcome, lang), encoding="utf-8")
     return str(path)
 
 
-def render_final_markdown(final_report: dict[str, Any]) -> str:
+def render_final_markdown(final_report: dict[str, Any], lang: str | None = None) -> str:
     """把 FinalAnalysisReport 渲染为最终量化分析报告（Markdown，无 emoji 工程文档风）。
 
     高风险及以上级别时，在报告顶部显著标注风险提示并强制列出约束边界。
+
+    Args:
+        final_report: ``FinalAnalysisReport.model_dump()`` 字典。
+        lang: 报告语言（``zh`` 默认 / ``en``）。注意 ``risk_gate`` 中的
+            banner / 约束边界文案由 :mod:`core.risk_gate` 在产出时已按同一语言生成。
     """
+    lang = normalize_report_language(lang)
+    colon = t("punct.colon", lang)
     gate = final_report.get("risk_gate") or {}
     level = final_report.get("overall_risk_level", "low")
-    label = _AUDIT_RISK_LABELS.get(level, level)
     blocked = final_report.get("final_decision") == "blocked"
 
-    lines: list[str] = [f"# 最终量化分析报告：{final_report.get('symbol', '')}", ""]
+    lines: list[str] = [
+        format_message("final.title", lang, symbol=final_report.get('symbol', '')),
+        "",
+    ]
 
     # ---- 顶部风险提示（致命/高风险显著标注）----
     if gate.get("risk_banner"):
         lines.extend([f"> **{gate['risk_banner']}**", ""])
     constraints = gate.get("constraint_boundaries") or []
     if constraints:
-        lines.append("**约束边界（强制）**\n")
+        lines.append(f"{t('final.constraints_title', lang)}\n")
         lines.extend(f"- {c}" for c in constraints)
         lines.append("")
 
     if blocked:
         # blocked 可能来自 critical，也可能来自 tradability=prohibited；
         # 文案据实说明触发路径，不写死「致命」。
-        trigger = (
-            "综合风险定级为致命（critical）"
+        trigger_key = (
+            "final.trigger_critical"
             if final_report.get("overall_risk_level") == "critical"
-            else "交易可行性被判定为禁止（prohibited）"
+            else "final.trigger_prohibited"
         )
         lines.extend([
-            f"> **本报告已拦截交易建议生成**：{trigger}，"
-            "在缺陷修复并重新通过红队审计前，不输出任何可执行交易建议。",
+            format_message("final.blocked_note", lang, trigger=t(trigger_key, lang)),
             "",
         ])
 
     lines.extend([
-        "| 项目 | 内容 |",
+        f"| {t('common.item', lang)} | {t('common.value', lang)} |",
         "| --- | --- |",
-        f"| 标的 | `{final_report.get('symbol', '')}` |",
-        f"| 市场 | {final_report.get('market', '')} |",
-        f"| 策略 | {final_report.get('strategy_name', '')} |",
-        f"| 辩论 run_id | `{final_report.get('debate_run_id', '')}` |",
-        f"| 审计 run_id | `{final_report.get('audit_run_id', '')}` |",
-        f"| 综合风险定级 | **{label}（{level}）** |",
-        f"| 最终决策 | **{final_report.get('final_decision', '')}** |",
-        f"| 策略可信度 | {final_report.get('credibility_score', 'N/A')} / 100 |",
+        f"| {t('debate.meta.symbol', lang)} | `{final_report.get('symbol', '')}` |",
+        f"| {t('debate.meta.market', lang)} | {final_report.get('market', '')} |",
+        f"| {t('final.meta.strategy', lang)} | {final_report.get('strategy_name', '')} |",
+        f"| {t('final.meta.debate_run_id', lang)} | `{final_report.get('debate_run_id', '')}` |",
+        f"| {t('final.meta.audit_run_id', lang)} | `{final_report.get('audit_run_id', '')}` |",
+        f"| {t('final.meta.overall_risk', lang)} | **{risk_level_display(level, lang)}** |",
+        f"| {t('final.meta.decision', lang)} | **{final_report.get('final_decision', '')}** |",
+        f"| {t('final.meta.credibility', lang)} | "
+        f"{final_report.get('credibility_score', t('common.na', lang))} / 100 |",
         "",
-        "本报告由 Quant Asst 风控综合官在「多空辩论 + 红队审计」之后产出，"
-        "仅用于研究与教育，不构成投资建议。",
+        t("final.disclaimer", lang),
         "",
     ])
 
-    lines.extend(["## 执行摘要\n", f"{final_report.get('executive_summary', '')}", ""])
+    lines.extend([
+        f"{t('final.executive_summary_title', lang)}\n",
+        f"{final_report.get('executive_summary', '')}",
+        "",
+    ])
 
     kf = final_report.get("key_findings") or []
-    lines.append(f"## 关键风险发现（{len(kf)} 条）\n")
-    lines.extend(f"- {k}" for k in kf or ["（无）"])
+    lines.append(format_message("final.key_findings_title", lang, n=len(kf)) + "\n")
+    lines.extend(f"- {k}" for k in kf or [t("common.none_paren", lang)])
     lines.append("")
 
     rec = final_report.get("recommendations") or []
-    lines.append(f"## 改进建议（{len(rec)} 条）\n")
-    lines.extend(f"- {r}" for r in rec or ["（无）"])
+    lines.append(format_message("final.recommendations_title", lang, n=len(rec)) + "\n")
+    lines.extend(f"- {r}" for r in rec or [t("common.none_paren", lang)])
     lines.append("")
 
     advisory = final_report.get("trade_advisory") or ""
-    lines.append("## 交易建议\n")
+    lines.append(f"{t('final.advisory_title', lang)}\n")
     # blocked 时门控写入拦截说明文案，直接呈现；仅当为空才用占位
     if not advisory:
-        lines.append(
-            "（无：致命风险已拦截交易建议生成，或当前风险级别未给出可执行建议。）"
-        )
+        lines.append(t("final.no_advisory", lang))
     else:
         lines.append(advisory)
     lines.append("")
@@ -352,11 +402,16 @@ def render_final_markdown(final_report: dict[str, Any]) -> str:
 
 
 def write_final_report(
-    final_report: dict[str, Any], out_dir, ticker: str, timestamp: str
+    final_report: dict[str, Any],
+    out_dir,
+    ticker: str,
+    timestamp: str,
+    lang: str | None = None,
 ) -> str:
     """渲染并落盘最终量化分析报告到 ``<out_dir>/audit/final_{ticker}_{timestamp}.md``。
 
     与审计报告同目录（``./output/audit/``），便于 GitHub Demo 一次性展示审计与最终结论。
+    ``lang`` 为报告语言（``zh`` 默认 / ``en``）。
     """
     from pathlib import Path
 
@@ -364,12 +419,12 @@ def write_final_report(
     target.mkdir(parents=True, exist_ok=True)
     safe_ticker = _sanitize_ticker(ticker or final_report.get("symbol", "unknown"))
     path = target / f"final_{safe_ticker}_{timestamp}.md"
-    path.write_text(render_final_markdown(final_report), encoding="utf-8")
+    path.write_text(render_final_markdown(final_report, lang), encoding="utf-8")
     return str(path)
 
 
 # ---------------------------------------------------------------------------
-# 参数网格寻优报告（Step J）
+# 参数网格寻优报告（Step J；Step K 双语）
 # ---------------------------------------------------------------------------
 
 #: 劣化判定阈值（与 backtest/optimizer.py 常量保持一致，报告须原样披露口径）
@@ -404,12 +459,14 @@ def _optimization_param_keys(result: dict[str, Any]) -> list[str]:
     return [str(k) for k in (result.get("grid") or {}).keys()]
 
 
-def render_optimization_markdown(result: dict[str, Any]) -> str:
+def render_optimization_markdown(result: dict[str, Any], lang: str | None = None) -> str:
     """把 :func:`backtest.optimizer.optimize_grid` 的结果渲染为 Markdown 寻优报告。
 
     风格与其他报告一致：工程文档风、无 emoji。包含全组合样本内/样本外对比表、
     样本内最优组合、样本外验证结论与明确的过拟合提示（劣化时原样标注 degraded）。
+    ``lang`` 为报告语言（``zh`` 默认 / ``en``）。
     """
+    lang = normalize_report_language(lang)
     grid = result.get("grid") or {}
     param_keys = _optimization_param_keys(result)
 
@@ -418,7 +475,7 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
         for key, values in grid.items():
             joined = ", ".join(str(v) for v in values)
             parts.append(f"{key} ∈ {{{joined}}}")
-        return "; ".join(parts) or "（无）"
+        return "; ".join(parts) or t("common.none_paren", lang)
 
     combos = result.get("combinations") or []
     best_index = result.get("best_index")
@@ -426,6 +483,10 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
     best_in = best.get("in_sample") or {}
     best_out = best.get("out_sample") or {}
     best_overall = best.get("overall") or {}
+
+    selection_metric = result.get("selection_metric", _OPTIMIZATION_PRIMARY_METRIC)
+    comparison_metric = result.get("comparison_metric", _OPTIMIZATION_COMPARISON_METRIC)
+    train_ratio = float(result.get("train_ratio", 0.7))
 
     # ---- 准入与对照排名（确定性）----
     ineligible_by_index = {
@@ -440,9 +501,7 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
     eligible_set = set(int(i) for i in eligible_indexes)
 
     def _return_rank_key(row: dict[str, Any]) -> tuple:
-        value = (row.get("in_sample") or {}).get(
-            result.get("comparison_metric", _OPTIMIZATION_COMPARISON_METRIC)
-        )
+        value = (row.get("in_sample") or {}).get(comparison_metric)
         return (
             float("inf") if value is None else -float(value),
             repr(sorted((row.get("params") or {}).items())),
@@ -455,38 +514,48 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
     return_rank = {int(row["index"]): pos + 1 for pos, row in enumerate(return_ranked)}
 
     lines: list[str] = [
-        f"# 参数网格寻优报告：{result.get('symbol', '')}",
+        format_message("opt.title", lang, symbol=result.get('symbol', '')),
         "",
-        "| 项目 | 内容 |",
+        f"| {t('common.item', lang)} | {t('common.value', lang)} |",
         "| --- | --- |",
-        f"| 标的 | `{result.get('symbol', '')}` |",
-        f"| 市场 | {result.get('market', '')} |",
-        f"| 回测区间 | {result.get('period_start', '')} ~ {result.get('period_end', '')} |",
-        f"| 样本内占比 | {float(result.get('train_ratio', 0.7)):.1%}"
-        f"（样本外起点 {result.get('out_sample_start') or 'N/A'}） |",
-        f"| 参数网格 | {_grid_desc()} |",
-        f"| 组合数 | {result.get('n_combinations', len(combos))} |",
-        f"| 选优指标 | 样本内 {result.get('selection_metric', _OPTIMIZATION_PRIMARY_METRIC)}"
-        f"（固定主指标）；对照指标：样本内 "
-        f"{result.get('comparison_metric', _OPTIMIZATION_COMPARISON_METRIC)} |",
-        f"| 准入门槛 | 样本内成交笔数 ≥ "
-        f"{result.get('min_in_sample_trades', 5)} 笔，不足者不参与选优 |",
-        f"| 初始资金 | ¥{float(result.get('initial_capital', 0.0)):,.0f} |",
-        f"| 沙箱模式 | {result.get('sandbox_mode', '')} |",
+        f"| {t('debate.meta.symbol', lang)} | `{result.get('symbol', '')}` |",
+        f"| {t('debate.meta.market', lang)} | {result.get('market', '')} |",
+        f"| {t('opt.meta.period', lang)} | {result.get('period_start', '')} ~ "
+        f"{result.get('period_end', '')} |",
+        f"| {t('opt.meta.train_ratio', lang)} | {train_ratio:.1%}"
+        + format_message(
+            "opt.meta.out_sample_start", lang, start=result.get('out_sample_start') or t('common.na', lang)
+        ) + " |",
+        f"| {t('opt.meta.grid', lang)} | {_grid_desc()} |",
+        f"| {t('opt.meta.combinations', lang)} | {result.get('n_combinations', len(combos))} |",
+        f"| {t('opt.meta.selection_metric', lang)} | "
+        + format_message(
+            "opt.meta.selection_metric_value", lang,
+            metric=selection_metric, comparison=comparison_metric,
+        ) + " |",
+        f"| {t('opt.meta.threshold', lang)} | "
+        + format_message(
+            "opt.meta.threshold_value", lang,
+            n=result.get('min_in_sample_trades', 5),
+        ) + " |",
+        f"| {t('opt.meta.initial_capital', lang)} | ¥{float(result.get('initial_capital', 0.0)):,.0f} |",
+        f"| {t('opt.meta.sandbox', lang)} | {result.get('sandbox_mode', '')} |",
         "",
-        "本报告由 Quant Asst 参数网格寻优流程自动生成，仅用于研究与教育，不构成投资建议。"
-        "寻优过程为纯确定性网格遍历，不调用任何 LLM。",
+        t("opt.disclaimer", lang),
         "",
     ]
 
     # ---- 全组合对比表 ----
-    lines.append(f"## 全组合样本内 / 样本外指标对比（{len(combos)} 组）\n")
-    header = ["#", *param_keys, "资格", "总收益排名",
-              "样本内总收益", "样本外总收益",
-              "样本内年化", "样本外年化",
-              "样本内最大回撤", "样本外最大回撤",
-              "样本内夏普", "样本外夏普",
-              "样本内笔数", "样本外笔数"]
+    lines.append(format_message("opt.compare_title", lang, n=len(combos)) + "\n")
+    header = [
+        "#", *param_keys,
+        t("opt.col.eligible", lang), t("opt.col.return_rank", lang),
+        t("opt.col.in_total", lang), t("opt.col.out_total", lang),
+        t("opt.col.in_annual", lang), t("opt.col.out_annual", lang),
+        t("opt.col.in_drawdown", lang), t("opt.col.out_drawdown", lang),
+        t("opt.col.in_sharpe", lang), t("opt.col.out_sharpe", lang),
+        t("opt.col.in_trades", lang), t("opt.col.out_trades", lang),
+    ]
     lines.append("| " + " | ".join(header) + " |")
     lines.append("| " + " | ".join(["---"] * len(header)) + " |")
     for row in combos:
@@ -496,7 +565,8 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
         index = int(row.get("index", -1))
         cells = [str(index), *(str(params.get(k, "")) for k in param_keys)]
         cells += [
-            "不合格" if index in ineligible_by_index else "合格",
+            t("opt.cell.ineligible", lang) if index in ineligible_by_index
+            else t("opt.cell.eligible", lang),
             str(return_rank[index]) if index in return_rank else "-",
             _signed_pct(in_m.get("total_return")), _signed_pct(out_m.get("total_return")),
             _signed_pct(in_m.get("annual_return")), _signed_pct(out_m.get("annual_return")),
@@ -508,11 +578,14 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
     lines.append("")
 
     # ---- 不参与选优的组合 ----
-    lines.append("## 不参与选优的组合（样本内成交笔数不足）\n")
+    lines.append(f"{t('opt.ineligible_title', lang)}\n")
     if not ineligible_by_index:
-        lines.extend(["全部组合均满足准入门槛。", ""])
+        lines.extend([t("opt.ineligible_none", lang), ""])
     else:
-        lines.append("| # | 参数 | 样本内笔数 | 原因 |")
+        lines.append(
+            f"| # | {t('opt.ineligible_col.params', lang)} | "
+            f"{t('opt.ineligible_col.in_trades', lang)} | {t('opt.ineligible_col.reason', lang)} |"
+        )
         lines.append("| --- | --- | --- | --- |")
         for item in sorted(ineligible_by_index.values(), key=lambda x: int(x["index"])):
             param_text = ", ".join(f"{k}={v}" for k, v in (item.get("params") or {}).items())
@@ -523,102 +596,105 @@ def render_optimization_markdown(result: dict[str, Any]) -> str:
         lines.append("")
 
     # ---- 最优组合 ----
-    selection_metric = result.get("selection_metric", _OPTIMIZATION_PRIMARY_METRIC)
-    comparison_metric = result.get("comparison_metric", _OPTIMIZATION_COMPARISON_METRIC)
-    lines.append(f"## 最优组合（按样本内 {selection_metric} 选定）\n")
+    lines.append(format_message("opt.best_title", lang, metric=selection_metric) + "\n")
     if not best:
-        lines.extend(["（无有效组合）", ""])
+        lines.extend([t("opt.no_valid", lang), ""])
     else:
-        lines.append("| 参数 | 取值 |")
+        lines.append(f"| {t('opt.param_col', lang)} | {t('opt.value_col', lang)} |")
         lines.append("| --- | --- |")
         for key in param_keys:
             lines.append(f"| {key} | {best.get('params', {}).get(key, '')} |")
         lines.append("")
-        lines.append("### 最优组合指标\n")
-        lines.append("| 指标 | 全区间 | 样本内 | 样本外 |")
+        lines.append(f"{t('opt.best_metrics_title', lang)}\n")
+        lines.append(
+            f"| {t('opt.metric_col', lang)} | {t('opt.overall_col', lang)} | "
+            f"{t('opt.in_col', lang)} | {t('opt.out_col', lang)} |"
+        )
         lines.append("| --- | --- | --- | --- |")
-        for field, label in (
-            ("total_return", "总收益"), ("annual_return", "年化收益"),
-            ("max_drawdown", "最大回撤"), ("sharpe", "夏普比率"),
-            ("win_rate", "按笔胜率"), ("n_trades", "成交笔数"),
+        for field in (
+            "total_return", "annual_return", "max_drawdown",
+            "sharpe", "win_rate", "n_trades",
         ):
             lines.append(
-                f"| {label} | {_fmt_metric(field, best_overall.get(field))} "
+                f"| {t(f'opt.metric.{field}', lang)} "
+                f"| {_fmt_metric(field, best_overall.get(field))} "
                 f"| {_fmt_metric(field, best_in.get(field))} "
                 f"| {_fmt_metric(field, best_out.get(field))} |"
             )
         lines.append("")
 
         return_best_index = result.get("return_best_index")
-        lines.append("### 选优指标对照（并列呈现，不做加权综合）\n")
-        lines.append(f"- 主指标（样本内 {selection_metric}）选定：组合 #{best_index}")
-        lines.append(
-            f"- 按样本内 {comparison_metric} 排序首位：组合 #{return_best_index}"
-        )
+        lines.append(f"{t('opt.compare_metric_title', lang)}\n")
+        lines.append(format_message(
+            "opt.primary_selected", lang, metric=selection_metric, index=best_index
+        ))
+        lines.append(format_message(
+            "opt.return_first", lang, metric=comparison_metric, index=return_best_index
+        ))
         agreement = result.get("metric_agreement")
         if agreement is True:
-            lines.append("- 结论：两个指标指向同一组合，结论一致。")
+            lines.append(t("opt.agree", lang))
         elif agreement is False:
-            lines.append(
-                "- 结论：两个指标**指向不同组合，结论冲突**；上表已并列呈现，"
-                "本流程不做加权综合，请结合样本外表现与红队审计人工判断。"
-            )
+            lines.append(t("opt.conflict", lang))
         lines.append("")
 
     # ---- 防泄漏声明 ----
     lines.extend([
-        "## 防泄漏声明",
+        f"{t('opt.leak_title', lang)}",
         "",
-        f"- 切分点在寻优开始前一次性固定：样本内占比 "
-        f"{float(result.get('train_ratio', 0.7)):.1%}，样本外起点 "
-        f"{result.get('out_sample_start') or 'N/A'}；全部分组合共用同一切分点，"
-        "执行时已校验各组合样本外起点一致。",
-        "- 网格遍历与选优仅使用样本内指标；样本外指标仅在选出最优组合后的最终验证中"
-        "使用一次（劣化判定），不参与任何筛选或排序。",
-        "- 寻优过程为纯确定性网格遍历，不调用任何 LLM，不使用随机数。",
+        format_message(
+            "opt.leak.split", lang,
+            ratio=f"{train_ratio:.1%}",
+            start=result.get('out_sample_start') or t('common.na', lang),
+        ),
+        t("opt.leak.selection", lang),
+        t("opt.leak.deterministic", lang),
         "",
     ])
 
     # ---- 样本外验证结论 ----
-    lines.append("## 样本外验证结论\n")
+    lines.append(f"{t('opt.oos_title', lang)}\n")
     degraded = bool(result.get("degraded"))
     reasons = result.get("degradation_reasons") or []
     if degraded:
-        lines.append("> **判定：degraded（样本外表现显著劣于样本内）**\n")
-        lines.extend(f"- 触发原因：{r}" for r in reasons)
+        lines.append(t("opt.degraded", lang) + "\n")
+        lines.extend(format_message("opt.degraded_reason", lang, reason=r) for r in reasons)
     else:
-        lines.append("> **判定：未触发劣化阈值**（样本外未显著劣于样本内）\n")
-        lines.append("- 本次最优组合的样本外指标未跌破下述任一阈值。")
+        lines.append(t("opt.not_degraded", lang) + "\n")
+        lines.append(t("opt.no_threshold_hit", lang))
     lines.extend([
         "",
-        "### 劣化判定口径（确定性阈值）",
+        f"{t('opt.threshold_title', lang)}",
         "",
-        f"- 样本内夏普为正且样本外夏普低于样本内的 {_OPTIMIZATION_SHARPE_RATIO:.0%}；",
-        "- 样本内总收益为正而样本外总收益非正（符号翻转）；",
-        f"- 样本外最大回撤比样本内更深超过 {_OPTIMIZATION_DRAWDOWN_EXTRA:.0%}。",
+        format_message("opt.threshold.sharpe", lang, ratio=f"{_OPTIMIZATION_SHARPE_RATIO:.0%}"),
+        t("opt.threshold.sign", lang),
+        format_message(
+            "opt.threshold.drawdown", lang, extra=f"{_OPTIMIZATION_DRAWDOWN_EXTRA:.0%}"
+        ),
         "",
-        "### 过拟合提示",
+        f"{t('opt.overfit_title', lang)}",
         "",
-        "网格寻优按**样本内**指标挑出最优组合，本质是对同一批数据反复试参，"
-        "样本内指标天然被高估；样本外未显著劣化只能说明该组合在既有切分下尚未暴露问题，"
-        "**不能排除过拟合**。任何进入实盘讨论的参数仍须使用完全独立的样本外区间复验，"
-        "并通过红队审计（未来函数 / 幸存者偏差 / 成本敏感性）确认。",
+        t("opt.overfit", lang),
         "",
     ])
     return "\n".join(lines)
 
 
-def write_optimization_report(result: dict[str, Any], out_dir) -> str:
+def write_optimization_report(result: dict[str, Any], out_dir, lang: str | None = None) -> str:
     """渲染并落盘寻优报告到 ``<out_dir>/optimization/optimization_<symbol>_<start>_<end>.md``。
 
     文件名**不含时间戳**：同一输入重复运行必然生成同名同内容文件（确定性约定）。
+    ``lang`` 为报告语言（``zh`` 默认 / ``en``）。
     """
     from pathlib import Path
 
     target = Path(out_dir) / "optimization"
     target.mkdir(parents=True, exist_ok=True)
     safe_symbol = _sanitize_ticker(result.get("symbol", "unknown"))
-    name = f"optimization_{safe_symbol}_{result.get('period_start', 'na')}_{result.get('period_end', 'na')}.md"
+    name = (
+        f"optimization_{safe_symbol}_{result.get('period_start', 'na')}_"
+        f"{result.get('period_end', 'na')}.md"
+    )
     path = target / name
-    path.write_text(render_optimization_markdown(result), encoding="utf-8")
+    path.write_text(render_optimization_markdown(result, lang), encoding="utf-8")
     return str(path)
