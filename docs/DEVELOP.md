@@ -214,7 +214,35 @@ uv run python cli.py backtest cn:600519 --lookahead-check   # 检查不通过即
   不再整根挂载项目目录；挂载列表层面显式排除 `.env` 及 `.env.*`；
   容器不接收宿主环境变量。
 
-## 7. 提交前检查清单
+## 7. 参数网格寻优（optimize）
+
+`cli.py optimize` 对策略参数做纯确定性网格遍历 + 样本外验证，不调用 LLM。
+策略代码须遵守扩展后的契约：模块级 `PARAMS` 字典 + `generate_positions(df, params=None)`，
+同一份代码因此可被不同参数组合重复调用（参考模板见 `examples/dual_ma.py`）。
+
+```bash
+# 花括号可省略；分号或空格分隔多个参数；也支持 JSON 写法
+uv run python cli.py optimize cn:600519 --start 2024-01-01 --end 2024-12-31 \
+    --strategy examples/dual_ma.py \
+    --grid "short_window=5,10;long_window=20,30" \
+    --train-ratio 0.7 --sandbox local
+```
+
+- **选优口径**：主指标固定为样本内夏普；另按样本内总收益给出对照排名，
+  两者结论冲突时并列呈现，不做加权综合。
+- **准入门槛**：样本内成交笔数 `< 5` 的组合标记 ineligible、不参与选优，
+  报告单独列出并写明原因（避免「零成交 + 零回撤」噪声组合靠指标当选）。
+- **防泄漏**：切分点在寻优开始前一次性固定，并校验各组合样本外起点一致；
+  选优只读样本内指标，样本外仅在最终劣化判定时使用一次。
+- **劣化判定**（命中任一即标注 `degraded`）：样本外夏普低于样本内的 50%；
+  样本内正收益而样本外非正；样本外最大回撤比样本内更深超过 10 个百分点。
+- **确定性**：无随机数、无时间戳；同一输入重复运行报告逐字节一致，
+  文件名同样不含时间戳。组合数上限 100，超限拒绝执行并提示缩小网格。
+- **产物**：`output/optimization/optimization_<symbol>_<start>_<end>.md`。
+- **测试**：`tests/test_optimizer.py`（解析/展开、准入门槛、双指标对照、
+  劣化触发、确定性、真实沙箱参数透传）。
+
+## 8. 提交前检查清单
 
 - [ ] `uv run pytest` 全量通过；
 - [ ] 涉及核心逻辑改动时同步更新 `core/schemas.py` 与相关测试；

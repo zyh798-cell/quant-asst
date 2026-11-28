@@ -75,6 +75,11 @@ uv run python cli.py run "双均线策略，5日线上穿20日线买入，死叉
 
 `run` uses the Docker sandbox by default (release-grade isolation). For development debugging add `--sandbox local` (weaker isolation, local use only).
 
+```bash
+# Parameter grid search with out-of-sample validation (deterministic, no LLM calls)
+uv run python cli.py optimize cn:600519 --grid "short_window=5,10;long_window=20,30"
+```
+
 ### CLI subcommands
 
 | Command | Purpose |
@@ -84,6 +89,7 @@ uv run python cli.py run "双均线策略，5日线上穿20日线买入，死叉
 | `audit` | Red-team audit plus risk synthesis over an existing debate report, producing an audit report and the final quantitative analysis report. |
 | `fetch` | Fetches daily bars and writes them to the local Parquet / DuckDB cache. |
 | `backtest` | Sends a strategy file into the sandbox engine to verify the link; add `--lookahead-check` for a deterministic lookahead check first (off by default). |
+| `optimize` | Deterministic parameter grid search with out-of-sample validation: backtests every combination, selects by in-sample Sharpe with an in-sample total-return comparison column, and flags `degraded` when OOS deteriorates materially. No LLM calls; reports land in `output/optimization/`. |
 | `doctor` | Environment self-check: configuration, dependencies, Docker, Qdrant, runtime directories. |
 | `settings` | Prints the effective configuration (never includes any key). |
 
@@ -105,7 +111,7 @@ Examples 03 / 04 fetch data once through AkShare on the first run and write it t
 
 ```
 quant-asst/
-├── cli.py               # CLI entry (typer): run / debate / audit / fetch / backtest / doctor / settings
+├── cli.py               # CLI entry (typer): run / debate / audit / fetch / backtest / optimize / doctor / settings
 ├── core/                # config, state machine (LangGraph), LLM wrapper and mock backend, schemas, risk gate, traces
 ├── agents/              # hypothesis / bull / bear / risk checker / judge / red team / risk synthesis
 ├── backtest/            # event-driven engine, performance metrics, market-specific rules

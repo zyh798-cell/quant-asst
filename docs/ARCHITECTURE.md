@@ -67,6 +67,7 @@
 | 阶段 | 输入 | 主要产物 | 落盘位置 |
 | --- | --- | --- | --- |
 | 回测（Step 3） | 自然语言 + 标的 + 区间 | `BacktestResult`（JSON 摘要） | State / 终端表格 |
+| 参数寻优（Step J） | 策略代码 + 标的/区间 + 参数网格 | 全组合样本内/外指标对比 + 最优组合 + 劣化结论 | `output/optimization/optimization_<symbol>_<start>_<end>.md` |
 | 辩论（Step 4） | 策略描述 + 标的 | `DebateOutcome` | `output/debate_reports/<run_id>.md` / `.json` |
 | 审计（Step 5） | 辩论 JSON | `AuditReport` + `FinalAnalysisReport` | `output/audit/audit_<ticker>_<timestamp>.md` / `final_<ticker>_<timestamp>.md` |
 | 可视化（Step 6） | 上述三类 + 参考回测明细 | 交互式 HTML + 结构化 JSON | `output/html/final_<ticker>_<timestamp>.html` / `.json` |
@@ -76,6 +77,10 @@
 `<ticker>` 为统一 symbol 转文件名安全形式（`cn:600519` -> `cn_600519`）；
 `<timestamp>` 为 `YYYYMMDD_HHMMSS`。HTML 图表的 K 线 / 信号 / 净值 / 回撤明细来自
 一次参考回测（复用既有工具链，失败时降级为纯文本报告）。
+
+参数寻优（`backtest/optimizer.py`）位于**回测引擎之上、报告渲染之前**：复用同一份策略代码
+与同一切分点做确定性网格遍历，只读样本内指标选优、样本外仅用于最终劣化验证，
+不进入辩论 / 审计链路（不调用 LLM）。
 
 ## 4. 关键数据模型（与代码一致）
 
